@@ -1,33 +1,33 @@
 import streamlit as st
 import pandas as pd
 import requests
-from streamlit_javascript import st_javascript
+from streamlit_js_eval import get_geolocation
 
 # --- 1. PAGE SETUP ---
 st.set_page_config(page_title="ATD Smart Tool", page_icon="⚡", layout="centered")
 
-# --- 2. CSS ---
+# --- 2. THEME & CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #050a0f !important; color: #ffffff !important; }
     label p { color: #00d4ff !important; font-weight: bold !important; }
-    div[data-testid="stMetricValue"] > div { color: #00ff41 !important; font-weight: 800 !important; }
+    div[data-testid="stMetricValue"] > div { color: #00ff41 !important; font-weight: 800; font-size: 32px !important; }
     .status-box { padding: 15px; background-color: #161b22; border: 1px solid #00d4ff; border-radius: 8px; color: #00d4ff !important; font-weight: bold; margin-bottom: 10px; }
     .footer-credit { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; font-size: 11px; background-color: #050a0f; color: #ffffff; border-top: 1px solid #30363d; z-index: 100; }
-    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; border-radius: 8px; }
+    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; border-radius: 8px; height: 3em; }
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATA & WEATHER FUNCTIONS ---
-def get_live_weather(lat, lon):
+# --- 3. WEATHER & AREA FUNCTION ---
+def get_weather_info(lat, lon):
     try:
-        # Reverse Geocoding for Area Name
+        # Area Name
         geo_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-        headers = {'User-Agent': 'ATD_Tool_V3'}
+        headers = {'User-Agent': 'ATD_Tool_JE_Final'}
         geo_res = requests.get(geo_url, headers=headers, timeout=5).json()
         address = geo_res.get('address', {})
-        area = address.get('city') or address.get('town') or address.get('village') or address.get('district') or "Unknown"
+        area = address.get('city') or address.get('town') or address.get('village') or address.get('district') or "Field Location"
         
         # Temperature
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
@@ -35,8 +35,9 @@ def get_live_weather(lat, lon):
         temp = round(float(w_res['current_weather']['temperature']), 1)
         return temp, area
     except:
-        return 35.0, "Manual"
+        return 35.0, "Manual Check"
 
+# --- 4. GOOGLE SHEET DATA ---
 SHEET_ID = "1vfioGSmpC7a5S8SMUpCk9xn-mtttvcTecLEQ1Sd6XkU"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
@@ -48,28 +49,16 @@ def load_data():
         return df
     except: return None
 
-# --- 4. APP UI ---
+# --- 5. MAIN UI ---
 st.markdown("<h2 style='text-align: center; color: #00d4ff;'>OHE ATD Smart Tool</h2>", unsafe_allow_html=True)
 
 df = load_data()
 
 # Session States
 if 'temp_val' not in st.session_state: st.session_state.temp_val = 35.0
-if 'area_name' not in st.session_state: st.session_state.area_name = "Tap 'Fetch Location' below"
+if 'area_name' not in st.session_state: st.session_state.area_name = "Click 'Auto-Fetch' to start"
 
-# --- 5. LOCATION PERMISSION LOGIC ---
-# Ye JS code browser se permission mangega
-loc_json = st_javascript("""
-    new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({lat: pos.coords.latitude, lon: pos.coords.longitude}),
-            (err) => resolve(null),
-            {enableHighAccuracy: true}
-        );
-    });
-""")
-
-# --- 6. INPUT SECTION ---
+# --- 6. INPUTS ---
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
@@ -85,17 +74,20 @@ with col1:
 with col2:
     theta_2 = st.number_input("🌡️ Temp (°C)", value=st.session_state.temp_val, step=0.1)
     
-    if st.button("🔄 Fetch Location & Temp"):
-        if loc_json:
-            with st.spinner('Updating...'):
-                new_t, new_a = get_live_weather(loc_json['lat'], loc_json['lon'])
-                st.session_state.temp_val = new_t
-                st.session_state.area_name = new_a
-                st.rerun()
+    if st.button("🔄 Auto-Fetch Local"):
+        # Mobile GPS trigger
+        loc = get_geolocation()
+        if loc:
+            lat = loc['coords']['latitude']
+            lon = loc['coords']['longitude']
+            new_t, new_a = get_weather_info(lat, lon)
+            st.session_state.temp_val = new_t
+            st.session_state.area_name = new_a
+            st.rerun()
         else:
-            st.error("Please allow location access in your browser.")
+            st.warning("Please tap 'Allow' on the browser popup.")
 
-st.caption(f"📍 Area: {st.session_state.area_name}")
+st.caption(f"📍 Current Area: {st.session_state.area_name}")
 
 # --- 7. CALCULATIONS ---
 delta = L * 0.000017 * (35 - theta_2) * 1000
