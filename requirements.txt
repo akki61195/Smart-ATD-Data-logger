@@ -2,3 +2,4 @@ streamlit
 pandas
 requests
 streamlit-javascript
+streamlit-js-eval
