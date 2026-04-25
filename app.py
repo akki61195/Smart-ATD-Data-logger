@@ -1,53 +1,62 @@
 import streamlit as st
 import pandas as pd
 import requests
-from streamlit_js_eval import get_geolocation
 
 # --- 1. PAGE SETUP ---
 st.set_page_config(page_title="ATD Smart Tool", page_icon="⚡", layout="centered")
 
-# --- 2. MOBILE OPTIMIZED CSS ---
+# --- 2. THEME & CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #050a0f !important; color: #ffffff !important; }
     label p { color: #00d4ff !important; font-weight: bold !important; font-size: 1.1rem !important; }
-    div[data-testid="stMetricValue"] > div { color: #00ff41 !important; font-weight: 800; font-size: 36px !important; }
-    
-    .stButton>button {
-        background-color: #00d4ff !important;
-        color: #000000 !important;
-        font-weight: bold !important;
-        width: 100% !important;
-        height: 3.5em !important;
-        border-radius: 10px !important;
-        font-size: 18px !important;
-    }
-    
+    div[data-testid="stMetricValue"] > div { color: #00ff41 !important; font-weight: 800; font-size: 34px !important; }
+    .stButton>button { background-color: #00d4ff !important; color: black !important; font-weight: bold !important; width: 100% !important; height: 3.8em !important; border-radius: 10px !important; }
     .status-box { padding: 12px; background-color: #1c2128; border: 1px solid #00d4ff; border-radius: 8px; color: #00d4ff !important; font-weight: bold; margin-bottom: 10px; text-align: center; }
     .footer-credit { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; font-size: 11px; background-color: #050a0f; color: #ffffff; border-top: 1px solid #30363d; z-index: 100; }
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. WEATHER ENGINE ---
-def get_live_weather(lat, lon):
+# --- 3. FORCE GPS SCRIPT ---
+# Ye script browser se coordinates lekar Streamlit ke "gps_coords" widget mein daal degi
+st.components.v1.html("""
+<script>
+    const options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 };
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+            window.parent.postMessage({
+                type: 'streamlit:set_widget_value',
+                key: 'gps_coords',
+                value: coords
+            }, '*');
+        },
+        (err) => { console.warn("GPS Error: " + err.message); },
+        options
+    );
+</script>
+""", height=0)
+
+# --- 4. WEATHER ENGINE ---
+def get_weather(lat, lon):
     try:
-        # Get Area Name
+        # Area Name
         geo_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-        headers = {'User-Agent': 'ATD_Tool_V5'}
+        headers = {'User-Agent': 'ATD_Tool_V6'}
         geo_res = requests.get(geo_url, headers=headers, timeout=5).json()
         address = geo_res.get('address', {})
-        area = address.get('city') or address.get('town') or address.get('village') or address.get('district') or "Trackside"
+        area = address.get('city') or address.get('town') or address.get('village') or address.get('district') or "Field Site"
         
-        # Get Temp
+        # Temp
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
         w_res = requests.get(w_url, timeout=5).json()
         temp = round(float(w_res['current_weather']['temperature']), 1)
         return temp, area
     except:
-        return 35.0, "Manual Check"
+        return None, None
 
-# --- 4. DATA LOADING ---
+# --- 5. DATA LOADING ---
 SHEET_ID = "1vfioGSmpC7a5S8SMUpCk9xn-mtttvcTecLEQ1Sd6XkU"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
@@ -59,15 +68,15 @@ def load_data():
         return df
     except: return None
 
-# --- 5. UI CONSTRUCTION ---
+# --- 6. UI ---
 st.markdown("<h2 style='text-align: center; color: #00d4ff;'>OHE ATD Smart Tool</h2>", unsafe_allow_html=True)
 df = load_data()
 
-# Initialize Session States
+# Session States
 if 'temp_val' not in st.session_state: st.session_state.temp_val = 35.0
-if 'area_name' not in st.session_state: st.session_state.area_name = "GPS Not Active"
+if 'area_name' not in st.session_state: st.session_state.area_name = "Waiting for GPS Lock..."
 
-# --- 6. INPUTS ---
+# --- 7. INPUTS ---
 if df is not None:
     structs = df['Structure_No'].dropna().unique().tolist()
     selected = st.selectbox("📍 Structure No", ["Manual Entry"] + structs)
@@ -77,24 +86,24 @@ if df is not None:
     else: L = st.number_input("Enter Length (L)", value=750.0)
 else: L = st.number_input("Enter Length (L)", value=750.0)
 
-# --- 7. THE FIX: STABLE GPS BUTTON ---
+# --- 8. GPS ACTION ---
 if st.button("🛰️ AUTO-FETCH LOCATION & TEMP"):
-    loc = get_geolocation() # Ye seedha mobile se permission maangega
-    if loc:
-        with st.spinner('Fetching Weather...'):
-            lat = loc['coords']['latitude']
-            lon = loc['coords']['longitude']
-            new_t, new_a = get_live_weather(lat, lon)
-            st.session_state.temp_val = new_t
-            st.session_state.area_name = new_a
-            st.rerun()
+    # Streamlit widget "gps_coords" se data read karna
+    gps = st.session_state.get('gps_coords')
+    if gps:
+        with st.spinner('Fetching weather for your coordinates...'):
+            new_t, new_a = get_weather(gps['lat'], gps['lon'])
+            if new_t is not None:
+                st.session_state.temp_val = new_t
+                st.session_state.area_name = new_a
+                st.rerun()
     else:
-        st.warning("Please allow location access in your browser settings (🔒 icon).")
+        st.error("GPS signal nahi mila. Ek baar 'Location' off karke on karein aur 2 second rukein.")
 
 theta_2 = st.number_input("🌡️ Current Temp (°C)", value=st.session_state.temp_val, step=0.1)
 st.caption(f"📍 Area: {st.session_state.area_name}")
 
-# --- 8. CALCULATIONS ---
+# --- 9. CALCULATIONS ---
 delta = L * 0.000017 * (35 - theta_2) * 1000
 x_val, y_val = 1300 + delta, 2300 + (3 * delta)
 
