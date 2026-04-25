@@ -1,43 +1,72 @@
 import streamlit as st
 import pandas as pd
 import requests
-from streamlit_js_eval import get_geolocation
 
 # --- 1. PAGE SETUP ---
 st.set_page_config(page_title="ATD Smart Tool", page_icon="⚡", layout="centered")
 
-# --- 2. THEME & CSS ---
+# --- 2. CSS (Professional Railway Theme) ---
 st.markdown("""
     <style>
     .stApp { background-color: #050a0f !important; color: #ffffff !important; }
-    label p { color: #00d4ff !important; font-weight: bold !important; }
-    div[data-testid="stMetricValue"] > div { color: #00ff41 !important; font-weight: 800; font-size: 32px !important; }
-    .status-box { padding: 15px; background-color: #161b22; border: 1px solid #00d4ff; border-radius: 8px; color: #00d4ff !important; font-weight: bold; margin-bottom: 10px; }
+    label p { color: #00d4ff !important; font-weight: bold !important; font-size: 1.1rem !important; }
+    div[data-testid="stMetricValue"] > div { color: #00ff41 !important; font-weight: 800 !important; font-size: 32px !important; }
+    .status-box { padding: 15px; background-color: #1c2128; border: 1px solid #00d4ff; border-radius: 8px; color: #00d4ff !important; font-weight: bold; margin-bottom: 10px; }
     .footer-credit { position: fixed; left: 0; bottom: 0; width: 100%; text-align: center; padding: 10px; font-size: 11px; background-color: #050a0f; color: #ffffff; border-top: 1px solid #30363d; z-index: 100; }
-    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; border-radius: 8px; height: 3em; }
+    .stButton>button { background-color: #00d4ff; color: black; font-weight: bold; width: 100%; border-radius: 8px; height: 3.5em; }
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. WEATHER & AREA FUNCTION ---
-def get_weather_info(lat, lon):
+# --- 3. HIGH-PRECISION GPS WATCHER ---
+# Ye script background mein location coordinate ko lock karegi
+gps_html = """
+<script>
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const coords = {
+                        lat: position.coords.latitude,
+                        lon: position.coords.longitude
+                    };
+                    window.parent.postMessage({
+                        type: 'streamlit:set_widget_value',
+                        key: 'gps_data',
+                        value: coords
+                    }, '*');
+                },
+                (error) => { console.error(error); },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+    }
+    // Har 5 second mein location check karega
+    setInterval(getLocation, 5000);
+    getLocation(); 
+</script>
+"""
+st.components.v1.html(gps_html, height=0)
+
+# --- 4. WEATHER ENGINE ---
+def get_weather_by_coords(lat, lon):
     try:
-        # Area Name
+        # Reverse Geocoding (Area Name)
         geo_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-        headers = {'User-Agent': 'ATD_Tool_JE_Final'}
+        headers = {'User-Agent': 'ATD_Tool_V4'}
         geo_res = requests.get(geo_url, headers=headers, timeout=5).json()
         address = geo_res.get('address', {})
-        area = address.get('city') or address.get('town') or address.get('village') or address.get('district') or "Field Location"
+        area = address.get('city') or address.get('town') or address.get('village') or address.get('district') or "Track Location"
         
-        # Temperature
+        # Current Temp
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
         w_res = requests.get(w_url, timeout=5).json()
         temp = round(float(w_res['current_weather']['temperature']), 1)
         return temp, area
     except:
-        return 35.0, "Manual Check"
+        return None, None
 
-# --- 4. GOOGLE SHEET DATA ---
+# Google Sheet Connection
 SHEET_ID = "1vfioGSmpC7a5S8SMUpCk9xn-mtttvcTecLEQ1Sd6XkU"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
@@ -49,16 +78,15 @@ def load_data():
         return df
     except: return None
 
-# --- 5. MAIN UI ---
+# --- 5. UI START ---
 st.markdown("<h2 style='text-align: center; color: #00d4ff;'>OHE ATD Smart Tool</h2>", unsafe_allow_html=True)
-
 df = load_data()
 
 # Session States
 if 'temp_val' not in st.session_state: st.session_state.temp_val = 35.0
-if 'area_name' not in st.session_state: st.session_state.area_name = "Click 'Auto-Fetch' to start"
+if 'area_name' not in st.session_state: st.session_state.area_name = "Waiting for GPS Lock..."
 
-# --- 6. INPUTS ---
+# --- 6. INPUT SECTION ---
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
@@ -72,22 +100,23 @@ with col1:
     else: L = st.number_input("Length (L)", value=750.0)
 
 with col2:
-    theta_2 = st.number_input("🌡️ Temp (°C)", value=st.session_state.temp_val, step=0.1)
-    
+    st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🔄 Auto-Fetch Local"):
-        # Mobile GPS trigger
-        loc = get_geolocation()
-        if loc:
-            lat = loc['coords']['latitude']
-            lon = loc['coords']['longitude']
-            new_t, new_a = get_weather_info(lat, lon)
-            st.session_state.temp_val = new_t
-            st.session_state.area_name = new_a
-            st.rerun()
+        if 'gps_data' in st.session_state and st.session_state.gps_data:
+            with st.spinner('Updating...'):
+                lat = st.session_state.gps_data['lat']
+                lon = st.session_state.gps_data['lon']
+                new_t, new_a = get_weather_by_coords(lat, lon)
+                if new_t:
+                    st.session_state.temp_val = new_t
+                    st.session_state.area_name = new_a
+                    st.rerun()
         else:
-            st.warning("Please tap 'Allow' on the browser popup.")
+            st.error("GPS lock nahi hua. Browser mein 'Location' Allow karke 5 second rukein.")
 
-st.caption(f"📍 Current Area: {st.session_state.area_name}")
+    theta_2 = st.number_input("🌡️ Current Temp (°C)", value=st.session_state.temp_val, step=0.1)
+
+st.caption(f"📍 Area: {st.session_state.area_name}")
 
 # --- 7. CALCULATIONS ---
 delta = L * 0.000017 * (35 - theta_2) * 1000
