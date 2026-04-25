@@ -5,7 +5,7 @@ import requests
 # --- 1. PAGE SETUP ---
 st.set_page_config(page_title="ATD Smart Tool", page_icon="⚡", layout="centered")
 
-# --- 2. PROFESSIONAL THEME ---
+# --- 2. CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #050a0f !important; color: #ffffff !important; }
@@ -18,43 +18,45 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. GPS SCRIPT (High Accuracy) ---
+# --- 3. DYNAMIC GPS SCRIPT ---
+# Ye script browser se live coordinates lega
 st.markdown("""
     <script>
     navigator.geolocation.getCurrentPosition(
         (pos) => {
             window.parent.postMessage({
                 type: 'streamlit:set_widget_value',
-                key: 'gps_val',
+                key: 'gps_coords',
                 value: [pos.coords.latitude, pos.coords.longitude]
             }, '*');
         },
-        (err) => { console.warn(err); },
+        (err) => { console.log("GPS Error"); },
         { enableHighAccuracy: true }
     );
     </script>
 """, unsafe_allow_html=True)
 
 # --- 4. DATA & WEATHER FUNCTIONS ---
-def get_weather_and_area(lat, lon):
+def get_live_data(lat, lon):
     try:
-        # Step 1: Get Area Name (Reverse Geocoding)
+        # Step 1: Area Name (Reverse Geocoding)
         geo_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-        headers = {'User-Agent': 'ATD_Smart_Tool_User'}
-        geo_data = requests.get(geo_url, headers=headers, timeout=5).json()
-        address = geo_data.get('address', {})
-        area_name = address.get('city') or address.get('town') or address.get('village') or address.get('suburb') or "Unknown"
+        headers = {'User-Agent': 'ATD_Smart_Tool_V2'}
+        geo_res = requests.get(geo_url, headers=headers, timeout=5).json()
+        address = geo_res.get('address', {})
+        # Junagadh, Mumbai ya koi bhi area detect hoga
+        area = address.get('city') or address.get('town') or address.get('district') or address.get('county') or "Unknown Area"
         
-        # Step 2: Get Temperature
+        # Step 2: Live Temperature
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
-        w_r = requests.get(w_url, timeout=5).json()
-        temp = round(float(w_r['current_weather']['temperature']), 1)
+        w_res = requests.get(w_url, timeout=5).json()
+        temp = round(float(w_res['current_weather']['temperature']), 1)
         
-        return temp, area_name
+        return temp, area
     except:
-        return 35.0, "Manual Check"
+        return 35.0, "Manual Entry Required"
 
-# Google Sheet Loading
+# Google Sheet Connection
 SHEET_ID = "1vfioGSmpC7a5S8SMUpCk9xn-mtttvcTecLEQ1Sd6XkU"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
@@ -71,14 +73,11 @@ st.markdown("<h2 style='text-align: center; color: #00d4ff;'>OHE ATD Smart Tool<
 
 df = load_data()
 
-if 'gps_val' not in st.session_state:
-    st.session_state.gps_val = [22.72, 71.64] # Default
-if 'temp_val' not in st.session_state:
-    st.session_state.temp_val = 35.0
-if 'area_name' not in st.session_state:
-    st.session_state.area_name = "Detecting Area..."
+# Initialize session states if not present
+if 'temp_val' not in st.session_state: st.session_state.temp_val = 35.0
+if 'loc_display' not in st.session_state: st.session_state.loc_display = "Waiting for GPS..."
 
-# --- 6. INPUT SECTION ---
+# --- 6. INPUTS ---
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
@@ -94,15 +93,19 @@ with col1:
 with col2:
     theta_2 = st.number_input("🌡️ Temp (°C)", value=st.session_state.temp_val, step=0.1)
     if st.button("🔄 Auto-Fetch"):
-        with st.spinner('Checking Location...'):
-            lat, lon = st.session_state.gps_val
-            new_t, new_area = get_weather_and_area(lat, lon)
-            st.session_state.temp_val = new_t
-            st.session_state.area_name = new_area
-            st.rerun()
-    st.caption(f"📍 Area: {st.session_state.area_name}")
+        if 'gps_coords' in st.session_state:
+            with st.spinner('Locating...'):
+                lat, lon = st.session_state.gps_coords
+                new_t, new_a = get_live_data(lat, lon)
+                st.session_state.temp_val = new_t
+                st.session_state.loc_display = new_a
+                st.rerun()
+        else:
+            st.warning("GPS not ready. Please allow location.")
 
-# --- 7. CALCULATIONS & OUTPUT ---
+st.caption(f"📍 Area: {st.session_state.loc_display}")
+
+# --- 7. CALCULATIONS ---
 delta = L * 0.000017 * (35 - theta_2) * 1000
 x_val, y_val = 1300 + delta, 2300 + (3 * delta)
 
