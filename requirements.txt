@@ -3,3 +3,4 @@ pandas
 requests
 streamlit-javascript
 streamlit-js-eval
+streamlit-geolocation 
