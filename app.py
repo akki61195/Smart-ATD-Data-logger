@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import requests
 from streamlit_geolocation import streamlit_geolocation
 
@@ -30,42 +31,70 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. WEATHER & AREA ENGINE ---
+# --- 2. DATA LOADING (Google Sheet) ---
+SHEET_ID = "1vfioGSmpC7a5S8SMUpCk9xn-mtttvcTecLEQ1Sd6XkU"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
+
+@st.cache_data
+def load_sheet_data():
+    try:
+        df = pd.read_csv(SHEET_URL)
+        df.columns = df.columns.str.strip()
+        return df
+    except:
+        return None
+
+# --- 3. WEATHER & AREA ENGINE ---
 def get_full_data(lat, lon):
     try:
-        # Weather Fetch
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
         w_res = requests.get(w_url, timeout=5).json()
         temp = round(float(w_res['current_weather']['temperature']), 1)
         
-        # Area Name Fetch (OpenStreetMap)
         g_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
         g_res = requests.get(g_url, headers={'User-Agent': 'RailwayTool'}, timeout=5).json()
         area = g_res.get('display_name', 'Local Section Detected')
         return temp, area
     except:
-        return 35.0, "Network Error (Manual Entry Required)"
+        return 35.0, "Network Error (Manual Entry Mode)"
 
-# --- 3. UI INITIALIZATION ---
+# --- 4. UI INITIALIZATION ---
 st.markdown("<h2 style='text-align: center; color: #00d4ff;'>OHE ATD Smart Tool</h2>", unsafe_allow_html=True)
 
 if 'temp_val' not in st.session_state: st.session_state.temp_val = 35.0
 if 'area_name' not in st.session_state: st.session_state.area_name = "GPS Not Active"
 
-# --- 4. STEP 1: GPS LOCK ---
-st.info("📍 Step 1: Click button and 'Allow' for GPS Lock")
+df = load_sheet_data()
+
+# --- 5. STRUCTURE SELECTION ---
+if df is not None:
+    struct_list = df['Structure_No'].dropna().unique().tolist()
+    selected_struct = st.selectbox("📍 Select Structure No", ["Manual Entry"] + struct_list)
+    
+    if selected_struct != "Manual Entry":
+        L = float(df[df['Structure_No'] == selected_struct]['Tension_Length'].values[0])
+        st.info(f"Tension Length (L) for {selected_struct}: **{L} m**")
+    else:
+        L = st.number_input("Enter Tension Length (L) manually", value=750.0)
+else:
+    st.error("Google Sheet load nahi ho rahi. Check connectivity.")
+    L = st.number_input("Enter Tension Length (L) manually", value=750.0)
+
+st.divider()
+
+# --- 6. GPS & WEATHER SYNC ---
+st.write("🛰️ Step 1: GPS Lock")
 location = streamlit_geolocation()
 
-# --- 5. STEP 2: SYNC WEATHER & AREA ---
 if location and location.get('latitude'):
-    if st.button("🌡️ STEP 2: FETCH LIVE AREA & TEMP"):
+    if st.button("🌡️ STEP 2: SYNC AREA & LIVE TEMP"):
         with st.spinner('Accessing local tower...'):
             t, a = get_full_data(location['latitude'], location['longitude'])
             st.session_state.temp_val = t
             st.session_state.area_name = a
-            st.success("✅ Sync Complete!")
+            st.success("✅ Data Updated!")
 
-# --- 6. DISPLAY AREA BOX (Jaisa aapne manga tha) ---
+# --- 7. DISPLAY AREA & RESULTS ---
 st.markdown(f"""
     <div class="area-box">
         <div class="area-label">📡 DETECTED SECTION</div>
@@ -73,9 +102,7 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# --- 7. INPUTS & CALCULATION ---
-L = st.number_input("Tension Length (L) in meters", value=750.0, step=1.0)
-theta_2 = st.number_input("🌡️ Current Temp (°C)", value=st.session_state.temp_val, step=0.1)
+theta_2 = st.number_input("🌡️ Working Temp (°C)", value=st.session_state.temp_val, step=0.1)
 
 # Logic using 35°C as standard reference
 delta = L * 0.000017 * (35 - theta_2) * 1000
