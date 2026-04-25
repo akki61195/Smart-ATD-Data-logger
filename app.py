@@ -1,64 +1,95 @@
 import streamlit as st
 import pandas as pd
-import requests # Nayi library live data ke liye
+import requests
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="ATD Smart Calc", page_icon="🌡️", layout="centered")
 
-# --- LIVE TEMP FUNCTION ---
-def get_live_temp(city="Surendranagar"):
-    try:
-        # OpenWeatherMap API (Free version)
-        # Note: Professional use ke liye aap apni personal API key le sakte hain
-        url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&appid=da06f9774917a14e590230f30501f21a"
-        response = requests.get(url).json()
-        temp = response['main']['temp']
-        return round(temp, 1)
-    except:
-        return 35.0 # Agar internet na ho toh default 35
-
-# --- CSS (Wahi Dark Blue Theme) ---
+# --- CUSTOM CSS (Dark Blue Theme) ---
 st.markdown("""
     <style>
     .stApp { background-color: #001f3f; color: white; }
     #MainMenu, footer, header {visibility: hidden;}
     .stDeployButton {display:none;}
-    .auto-temp-box {
-        background-color: rgba(0, 212, 255, 0.2);
-        padding: 10px;
+    div[data-testid="stMetric"] {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px;
         border-radius: 10px;
-        text-align: center;
-        border: 1px solid #00d4ff;
+    }
+    .footer-credit {
+        position: fixed; left: 0; bottom: 0; width: 100%;
+        text-align: center; padding: 10px; font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER ---
-st.markdown("<h2 style='text-align: center;'>OHE ATD Smart Calculator</h2>", unsafe_allow_html=True)
+# --- FUNCTION: FETCH TEMP FROM OPEN-METEO ---
+def get_openmeteo_temp(lat, lon):
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+        response = requests.get(url, timeout=5).json()
+        temp = response['current_weather']['temperature']
+        return round(float(temp), 1)
+    except Exception as e:
+        return 35.0 # Fallback temperature
 
-# --- AUTO TEMP FETCH ---
-live_temp = get_live_temp("Surendranagar") # Aapka sheher
+# --- GPS JAVASCRIPT ---
+# Browser se coordinate lene ke liye
+st.markdown("""
+    <script>
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            window.parent.postMessage({
+                type: 'streamlit:set_widget_value',
+                key: 'gps_coords',
+                value: [lat, lon]
+            }, '*');
+        }
+    );
+    </script>
+""", unsafe_allow_html=True)
+
+# --- APP LOGIC ---
+st.markdown("<h2 style='text-align: center;'>OHE ATD Smart Tool</h2>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; opacity: 0.7;'>GPS & Open-Meteo Integrated</p>", unsafe_allow_html=True)
+
+# Location Data Handling
+if 'gps_coords' not in st.session_state:
+    # Default to Surendranagar coordinates if GPS not yet loaded
+    st.session_state.gps_coords = [22.72, 71.64]
+
+lat, lon = st.session_state.gps_coords
+live_temp = get_openmeteo_temp(lat, lon)
 
 # --- INPUT SECTION ---
 col1, col2 = st.columns([1.5, 1])
 
 with col1:
-    L = st.number_input("Tension Length (L)", value=750.0)
+    L = st.number_input("Tension Length (L)", value=750.0, step=10.0)
+    st.caption(f"📍 Current GPS: {lat}, {lon}")
 
 with col2:
-    # Yahan temperature ab apne aap fetch hoga
     theta_2 = st.number_input("🌡️ Current Temp (°C)", value=live_temp, step=0.1)
-    st.markdown(f"<div class='auto-temp-box'>Live: {live_temp}°C</div>", unsafe_allow_html=True)
+    if st.button("🔄 Refresh Temp"):
+        st.rerun()
 
 # --- CALCULATIONS ---
-alpha, theta_1 = 0.000017, 35
+alpha = 0.000017
+theta_1 = 35 # Standard Temp
 delta_1 = L * alpha * (theta_1 - theta_2) * 1000
-x_val, y_val = 1300 + delta_1, 2300 + (3 * delta_1)
+x_val = 1300 + delta_1
+y_val = 2300 + (3 * delta_1)
 
 # --- RESULTS ---
+st.markdown("---")
 st.write("#### Technical Output")
 r1, r2 = st.columns(2)
 r1.metric("X Value (Pulley)", f"{round(x_val, 1)} mm", f"{round(delta_1, 1)} mm")
 r2.metric("Y Value (Weight)", f"{round(y_val, 1)} mm", f"{round(3*delta_1, 1)} mm")
 
-st.markdown("<div style='position: fixed; bottom: 10px; width: 100%; text-align: center; font-size: 20px; opacity: 0.4;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
+# --- FOOTER ---
+st.markdown(f"<div class='footer-credit'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
