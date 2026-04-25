@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from streamlit_javascript import st_javascript
+from streamlit_geolocation import streamlit_geolocation
 
 # --- 1. PAGE SETUP ---
 st.set_page_config(page_title="Railway Location Sync", page_icon="📍")
@@ -17,41 +17,46 @@ st.markdown("""
         font-weight: bold;
         color: #00d4ff;
     }
+    /* Button ko railway style mein bada karne ke liye */
+    button[kind="secondary"] {
+        background-color: #00d4ff !important;
+        color: black !important;
+        font-weight: bold !important;
+        width: 100% !important;
+        height: 4em !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. THE FETCH LOGIC ---
 st.title("🛰️ OHE Location Sync")
+st.write("Niche diye gaye button par click karke 'Allow' karein.")
 
-# Ye JavaScript seedha mobile browser se GIS data nikalega
-js_geo = "{lat: 0, lon: 0}; navigator.geolocation.getCurrentPosition((pos) => { window.parent.postMessage({type: 'streamlit:set_widget_value', key: 'location', value: {lat: pos.coords.latitude, lon: pos.coords.longitude}}, '*'); });"
+# --- 2. THE COMPONENT ---
+# Ye component ek pre-made button deta hai jo hardware access karta hai
+location = streamlit_geolocation()
 
-st.write("Section detect karne ke liye niche check karein.")
-
-# JavaScript execution
-loc = st_javascript("navigator.geolocation.getCurrentPosition(pos => { return {lat: pos.coords.latitude, lon: pos.coords.longitude}; });")
-
-if loc and isinstance(loc, dict) and loc.get('lat') != 0:
-    lat, lon = loc['lat'], loc['lon']
+if location and location.get('latitude'):
+    lat = location['latitude']
+    lon = location['longitude']
     
-    # Area Name Fetching
+    # Reverse Geocoding to get Area Name
     try:
-        res = requests.get(f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}", headers={'User-Agent': 'RailwayTool'}, timeout=5).json()
-        area = res.get('display_name', 'Location found but name unavailable')
+        # User-Agent header zaroori hai Nominatim API ke liye
+        url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+        res = requests.get(url, headers={'User-Agent': 'RailwayATD_Tool'}, timeout=5).json()
+        area = res.get('display_name', 'Location Detected')
     except:
-        area = "Connection Error (Area Name)"
+        area = f"Coordinates: {lat}, {lon}"
 
-    st.markdown(f"<div class='area-display'>{area}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='area-display'>📍 {area}</div>", unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     c1.metric("Latitude", round(lat, 5))
     c2.metric("Longitude", round(lon, 5))
-    st.success("✅ GPS Data Synced Successfully")
+    st.success("✅ Phase 1 Complete: Location Synced!")
 
 else:
-    st.warning("⏳ GPS signal ka intezar hai... Please 'Allow' permission click karein.")
-    if st.button("🔄 Force Refresh Location"):
-        st.rerun()
+    st.info("Waiting... Button dabane par Chrome aapse permission maangega.")
 
 st.divider()
-st.caption("Phase 1.3 | Hardware-Level Sync | JE/TRD Mulchandani")
+st.caption("Phase 1.4 | Component-Level Access | JE/TRD Mulchandani")
