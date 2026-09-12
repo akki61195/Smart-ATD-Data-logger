@@ -73,8 +73,7 @@ fontName='Helvetica-Bold',
         fontSize=20,
 textColor=colors.HexColor('#00E5FF'),
 spaceAfter=15,
-alignment=1
-)
+alignment=1)
 
     story.append(Paragraph("OHE ATD Calculation Record", title_style))
     story.append(Spacer(1, 10))
