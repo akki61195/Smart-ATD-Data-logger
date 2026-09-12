@@ -140,65 +140,70 @@ import io
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
-# --- HIGH QUALITY IMAGE CARD GENERATOR ---
+# --- 3K HIGH-RESOLUTION READABLE IMAGE CARD ---
 
 curr_dt = datetime.now().strftime("%d-%b-%Y %I:%M:%S %p")
 
-# 1. Image Quality Increase (Super Sampling 2x for HD Sharp Text)
-scale = 2
+# 3x Scaling for Ultra HD Quality (2700 x 1650 pixels)
+scale = 3
 width, height = 900 * scale, 550 * scale
 img = Image.new("RGB", (width, height), color="#050a0f")
 draw = ImageDraw.Draw(img)
 
-# Font Sizing for High Resolution
+# Dynamic Font System with Large Font Sizes
 try:
-    font_title = ImageFont.truetype("arial.ttf", 36 * scale)
-    font_body = ImageFont.truetype("arial.ttf", 24 * scale)
-    font_val = ImageFont.truetype("arial.ttf", 30 * scale)
+    font_title = ImageFont.truetype("arial.ttf", 25 * scale)
+    font_body = ImageFont.truetype("arial.ttf", 17 * scale)
+    font_val = ImageFont.truetype("arial.ttf", 20 * scale)
 except IOError:
-    font_title = font_body = font_val = ImageFont.load_default()
+    # Fallback with explicit sizing for built-in font
+    font_title = ImageFont.load_default(size=25 * scale)
+    font_body = ImageFont.load_default(size=17 * scale)
+    font_val = ImageFont.load_default(size=20 * scale)
 
-# Outer Border & Title Header
-draw.rectangle([15 * scale, 15 * scale, width - 15 * scale, height - 15 * scale], outline="#00d4ff", width=4 * scale)
-draw.text((35 * scale, 35 * scale), "⚡ OHE ATD SMART TOOL RECORD", fill="#00d4ff", font=font_title)
-draw.line([(35 * scale, 90 * scale), (width - 35 * scale, 90 * scale)], fill="#00d4ff", width=2 * scale)
+# Border & Title Box
+draw.rectangle([20 * scale, 20 * scale, width - 20 * scale, height - 20 * scale], outline="#00d4ff", width=5 * scale)
+draw.text((40 * scale, 40 * scale), "⚡ OHE ATD SMART TOOL RECORD", fill="#00d4ff", font=font_title)
+draw.line([(40 * scale, 100 * scale), (width - 40 * scale, 100 * scale)], fill="#00d4ff", width=3 * scale)
 
-# Data Content
+# Main Content Lines (Large & Crisp)
 lines = [
     f"📅 Date & Time: {curr_dt}",
-    f"📍 Location / Section: {st.session_state.area_name[:40]}",
+    f"📍 Section: {st.session_state.area_name[:35]}",
     f"📏 Tension Length (L): {L} m",
     f"🌡️ Temperature: {theta_2} °C",
 ]
 
-y_off = 120 * scale
+y_off = 130 * scale
 for line in lines:
-    draw.text((35 * scale, y_off), line, fill="#ffffff", font=font_body)
-    y_off += 45 * scale
+    draw.text((40 * scale, y_off), line, fill="#ffffff", font=font_body)
+    y_off += 50 * scale
 
-# X & Y Output Box
-draw.rectangle([35 * scale, 340 * scale, width - 35 * scale, 500 * scale], fill="#1c2128", outline="#00ff41", width=3 * scale)
-draw.text((60 * scale, 365 * scale), f"Calculated X Value : {x_val:.0f} mm", fill="#00ff41", font=font_val)
-draw.text((60 * scale, 430 * scale), f"Calculated Y Value : {y_val:.0f} mm", fill="#00ff41", font=font_val)
+# X & Y Calculation Result Box
+draw.rectangle([40 * scale, 350 * scale, width - 40 * scale, 500 * scale], fill="#1c2128", outline="#00ff41", width=4 * scale)
+draw.text((60 * scale, 375 * scale), f"Calculated X Value : {x_val:.0f} mm", fill="#00ff41", font=font_val)
+draw.text((60 * scale, 435 * scale), f"Calculated Y Value : {y_val:.0f} mm", fill="#00ff41", font=font_val)
 
-# PNG Buffer Export
+# High Quality PNG Output
 buf = io.BytesIO()
-img.save(buf, format="PNG", optimize=True)
+img.save(buf, format="PNG", compress_level=1)
 
-# --- 2. CENTERED BUTTON WITH CUSTOM STYLING ---
+# --- CENTERED STYLED BUTTON ---
 st.markdown("""
     <style>
     div[data-testid="stDownloadButton"] {
         display: flex;
         justify-content: center;
+        margin-top: 20px;
     }
     div[data-testid="stDownloadButton"] > button {
-        background-color: #002b49 !important; /* Dark Blue */
-        color: #ccff00 !important;             /* Lime Yellow/Green */
+        background-color: #002b49 !important;
+        color: #ccff00 !important;
         border: 2px solid #00d4ff !important;
         font-weight: bold !important;
-        font-size: 16px !important;
-        width: 220px !important;
+        font-size: 18px !important;
+        width: 240px !important;
+        height: 50px !important;
         border-radius: 8px !important;
     }
     div[data-testid="stDownloadButton"] > button:hover {
@@ -214,5 +219,4 @@ st.download_button(
     file_name=f"ATD_Record_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
     mime="image/png"
 )
-
 st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
