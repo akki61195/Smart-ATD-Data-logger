@@ -136,35 +136,40 @@ c1.metric("X (Pulley Gap)", f"{round(x_val, 1)} mm")
 c2.metric("Y (Weight Height)", f"{round(y_val, 1)} mm")
 
 st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
+
 import datetime
 
-# --- SAVE RECORD BUTTONS WITH TIMESTAMP ---
+# --- SAVE RECORD BUTTONS ---
 st.markdown("### 💾 Save Record")
 
-col_pdf, col_img = st.columns(2)
+# Create dataframe dynamically to prevent NameError
+export_df = pd.DataFrame([{
+    "Ambient Temp (°C)": st.session_state.ambient_temp if "ambient_temp" in st.session_state else 35.0,
+    "X Value (mm)": calc_x,
+    "Y Value (mm)": calc_y,
+    "Date & Time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+}])
 
-with col_pdf:
-    # Standard PDF/CSV download button
+col_csv, col_img = st.columns(2)
+
+with col_csv:
     st.download_button(
-        label="📄 Save Record as PDF / Data",
+        label="📄 Save Record as CSV",
         data=export_df.to_csv(index=False),
         file_name=f"ATD_Record_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         mime="text/csv"
     )
 
 with col_img:
-    # Client-side Image Capture button with Date & Time stamp
     st.components.v1.html("""
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
         <script>
         function captureWithTimestamp() {
             var el = window.parent.document.querySelector('.stApp') || window.parent.document.body;
             
-            // Current Date & Time String
             var now = new Date();
             var timeString = "Saved on: " + now.toLocaleDateString() + " at " + now.toLocaleTimeString();
 
-            // Temporary Timestamp Watermark Banner
             var watermark = window.parent.document.createElement('div');
             watermark.id = "temp-timestamp-watermark";
             watermark.innerText = timeString;
@@ -172,14 +177,12 @@ with col_img:
             
             el.appendChild(watermark);
 
-            // Screen Capture
             html2canvas(el, { backgroundColor: '#050a0f' }).then(function(canvas) {
                 var a = document.createElement('a');
                 a.download = 'ATD_Record_' + now.toISOString().slice(0,10) + '.png';
                 a.href = canvas.toDataURL('image/png');
                 a.click();
                 
-                // Remove watermark after taking screenshot
                 watermark.remove();
             });
         }
@@ -198,3 +201,4 @@ with col_img:
             📷 Save Record as Image (PNG)
         </button>
     """, height=45)
+
