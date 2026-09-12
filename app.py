@@ -142,11 +142,13 @@ import datetime
 # --- SAVE RECORD BUTTONS ---
 st.markdown("### 💾 Save Record")
 
-# Create dataframe dynamically to prevent NameError
+# Safely capture calculated values or fall back to default
+x_val = calc_x if 'calc_x' in locals() else 1300.0
+y_val = calc_y if 'calc_y' in locals() else 2300.0
+
 export_df = pd.DataFrame([{
-    "Ambient Temp (°C)": st.session_state.ambient_temp if "ambient_temp" in st.session_state else 35.0,
-    "X Value (mm)": calc_x,
-    "Y Value (mm)": calc_y,
+    "X Value (Pulley Gap)": x_val,
+    "Y Value (Weight Height)": y_val,
     "Date & Time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 }])
 
@@ -201,4 +203,3 @@ with col_img:
             📷 Save Record as Image (PNG)
         </button>
     """, height=45)
-
