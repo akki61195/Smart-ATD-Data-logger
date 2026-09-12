@@ -213,7 +213,6 @@ record_data = {
 export_col1, export_col2 = st.columns(2)
 
 with export_col1:
-    # PDF Download Button
     pdf_buffer = generate_pdf(record_data)
     st.download_button(
         label="📄 Save Record as PDF",
@@ -223,7 +222,6 @@ with export_col1:
     )
 
 with export_col2:
-    # Client-side Image Download using html2canvas
     st.components.v1.html("""
         <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
         <script>
