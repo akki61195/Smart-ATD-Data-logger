@@ -154,7 +154,6 @@ width, height = 900 * scale, 550 * scale
 img = Image.new("RGB", (width, height), color="#050a0f")
 draw = ImageDraw.Draw(img)
 
-# Dynamic Font Allocation
 try:
     font_title = ImageFont.load_default(size=25 * scale)
     font_body = ImageFont.load_default(size=17 * scale)
@@ -218,7 +217,7 @@ draw.text(
 buf = io.BytesIO()
 img.save(buf, format="PNG")
 
-# --- 3. CENTERED STYLED BUTTON & SUCCESS LOGIC ---
+# --- 3. CENTERED STYLED BUTTON & TOAST CONFIRMATION ---
 st.markdown(
     """<style>
     div[data-testid="stDownloadButton"] {
@@ -244,13 +243,15 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-saved = st.download_button(
+# Callback function to show notification on click
+def notify_save():
+    st.toast("✅ Image Saved Successfully!", icon="💾")
+
+st.download_button(
     label="💾 SAVE IMG",
     data=buf.getvalue(),
     file_name=f"ATD_Record_{datetime.now(ist_offset).strftime('%Y%m%d_%H%M%S')}.png",
     mime="image/png",
+    on_click=notify_save
 )
-
-if saved:
-    st.success("✅ Image Saved Successfully!")
 st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
