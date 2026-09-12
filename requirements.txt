@@ -5,3 +5,4 @@ streamlit-javascript
 streamlit-js-eval
 streamlit-geolocation 
 reportlab
+pillow
