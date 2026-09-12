@@ -136,3 +136,64 @@ c1.metric("X (Pulley Gap)", f"{round(x_val, 1)} mm")
 c2.metric("Y (Weight Height)", f"{round(y_val, 1)} mm")
 
 st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
+
+import io
+from datetime import datetime
+from PIL import Image, ImageDraw, ImageFont
+
+# --- SAVE BUTTON & TIMESTAMP FEATURE ---
+st.subheader("💾 Save & Download Processed Image")
+
+uploaded_file = st.file_uploader(
+    "Upload an Image to Stamp & Save", type=["jpg", "jpeg", "png"]
+)
+
+if uploaded_file is not None:
+    # Open original image
+    img = Image.open(uploaded_file).convert("RGB")
+    draw = ImageDraw.Draw(img)
+
+    # Get current timestamp
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    stamp_text = f"Stamped: {current_time}"
+
+    # Calculate text size and position (Bottom Right Corner)
+    width, height = img.size
+    font_size = max(20, int(height * 0.03))  # Dynamic font sizing
+
+    try:
+        font = ImageFont.truetype("arial.ttf", font_size)
+    except IOError:
+        font = ImageFont.load_default()
+
+    # Draw semi-transparent background box for timestamp
+    padding = 10
+    box_width = font_size * len(stamp_text) * 0.6
+    box_height = font_size + padding
+    x_pos = width - box_width - 20
+    y_pos = height - box_height - 20
+
+    draw.rectangle(
+        [x_pos, y_pos, x_pos + box_width, y_pos + box_height], fill=(0, 0, 0)
+    )
+    draw.text(
+        (x_pos + 5, y_pos + 5), stamp_text, fill=(0, 255, 65), font=font
+    )  # Green text
+
+    # Show preview in app
+    st.image(
+        img, caption="Preview with Timestamp", use_container_width=True
+    )
+
+    # Convert Image to Byte Buffer for Download
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=95)
+    byte_im = buf.getvalue()
+
+    # Streamlit Save/Download Button
+    st.download_button(
+        label="📥 SAVE IMAGE WITH TIMESTAMP",
+        data=byte_im,
+        file_name=f"ATD_Record_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
+        mime="image/jpeg",
+    )
