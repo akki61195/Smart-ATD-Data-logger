@@ -139,62 +139,91 @@ c2.metric("Y (Weight Height)", f"{round(y_val, 1)} mm")
 import io
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
+import pytz
 
-# --- 3K HIGH-RESOLUTION READABLE IMAGE CARD ---
+# --- IST TIME ZONE FIX ---
+ist = pytz.timezone("Asia/Kolkata")
+curr_dt = datetime.now(ist).strftime("%d-%b-%Y %I:%M:%S %p")
 
-curr_dt = datetime.now().strftime("%d-%b-%Y %I:%M:%S %p")
+struct_disp = selected_struct if "selected_struct" in locals() else "N/A"
 
-# 3x Scaling for Ultra HD Quality (2700 x 1650 pixels)
+# 3x Scaling for Ultra HD Quality
 scale = 3
 width, height = 900 * scale, 550 * scale
 img = Image.new("RGB", (width, height), color="#050a0f")
 draw = ImageDraw.Draw(img)
 
-# Dynamic Font System with Large Font Sizes
 try:
-    font_title = ImageFont.truetype("arial.ttf", 25 * scale)
-    font_body = ImageFont.truetype("arial.ttf", 17 * scale)
-    font_val = ImageFont.truetype("arial.ttf", 20 * scale)
-except IOError:
-    # Fallback with explicit sizing for built-in font
     font_title = ImageFont.load_default(size=25 * scale)
     font_body = ImageFont.load_default(size=17 * scale)
     font_val = ImageFont.load_default(size=20 * scale)
+except Exception:
+    font_title = font_body = font_val = ImageFont.load_default()
 
-# Border & Title Box
-draw.rectangle([20 * scale, 20 * scale, width - 20 * scale, height - 20 * scale], outline="#00d4ff", width=5 * scale)
-draw.text((40 * scale, 40 * scale), "⚡ OHE ATD SMART TOOL RECORD", fill="#00d4ff", font=font_title)
-draw.line([(40 * scale, 100 * scale), (width - 40 * scale, 100 * scale)], fill="#00d4ff", width=3 * scale)
+# Outer Border & Title Header
+draw.rectangle(
+    [20 * scale, 20 * scale, width - 20 * scale, height - 20 * scale],
+    outline="#00d4ff",
+    width=5 * scale,
+)
+draw.text(
+    (40 * scale, 40 * scale),
+    "⚡ OHE ATD SMART TOOL RECORD",
+    fill="#00d4ff",
+    font=font_title,
+)
+draw.line(
+    [(40 * scale, 100 * scale), (width - 40 * scale, 100 * scale)],
+    fill="#00d4ff",
+    width=3 * scale,
+)
 
-# Main Content Lines (Large & Crisp)
+# Text Content Lines with Location and Structure No.
 lines = [
     f"📅 Date & Time: {curr_dt}",
-    f"📍 Section: {st.session_state.area_name[:35]}",
+    f"📍 Location / Section: {st.session_state.area_name[:40]}",
+    f"🏗️ Structure No: {struct_disp}",
     f"📏 Tension Length (L): {L} m",
     f"🌡️ Temperature: {theta_2} °C",
 ]
 
-y_off = 130 * scale
+y_off = 120 * scale
 for line in lines:
     draw.text((40 * scale, y_off), line, fill="#ffffff", font=font_body)
-    y_off += 50 * scale
+    y_off += 42 * scale
 
-# X & Y Calculation Result Box
-draw.rectangle([40 * scale, 350 * scale, width - 40 * scale, 500 * scale], fill="#1c2128", outline="#00ff41", width=4 * scale)
-draw.text((60 * scale, 375 * scale), f"Calculated X Value : {x_val:.0f} mm", fill="#00ff41", font=font_val)
-draw.text((60 * scale, 435 * scale), f"Calculated Y Value : {y_val:.0f} mm", fill="#00ff41", font=font_val)
+# X & Y Output Box
+draw.rectangle(
+    [40 * scale, 360 * scale, width - 40 * scale, 500 * scale],
+    fill="#1c2128",
+    outline="#00ff41",
+    width=4 * scale,
+)
+draw.text(
+    (60 * scale, 380 * scale),
+    f"Calculated X Value : {x_val:.0f} mm",
+    fill="#00ff41",
+    font=font_val,
+)
+draw.text(
+    (60 * scale, 435 * scale),
+    f"Calculated Y Value : {y_val:.0f} mm",
+    fill="#00ff41",
+    font=font_val,
+)
 
-# High Quality PNG Output
+# PNG Buffer Export
 buf = io.BytesIO()
-img.save(buf, format="PNG", compress_level=1)
+img.save(buf, format="PNG")
 
-# --- CENTERED STYLED BUTTON ---
-st.markdown("""
+# --- CENTERED STYLED BUTTON & SUCCESS MESSAGE ---
+st.markdown(
+    """
     <style>
     div[data-testid="stDownloadButton"] {
         display: flex;
         justify-content: center;
-        margin-top: 20px;
+        margin-top: 15px;
     }
     div[data-testid="stDownloadButton"] > button {
         background-color: #002b49 !important;
@@ -211,12 +240,18 @@ st.markdown("""
         color: #ffffff !important;
     }
     </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-st.download_button(
+saved = st.download_button(
     label="💾 SAVE IMG",
     data=buf.getvalue(),
-    file_name=f"ATD_Record_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-    mime="image/png"
+    file_name=f"ATD_Record_{datetime.now(ist).strftime('%Y%m%d_%H%M%S')}.png",
+    mime="image/png",
+    on_click=lambda: st.session_state.update({"img_downloaded": True}),
 )
+
+if st.session_state.get("img_downloaded"):
+    st.success("✅ Image Saved Successfully!")
 st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
