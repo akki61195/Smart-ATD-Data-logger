@@ -137,13 +137,12 @@ c2.metric("Y (Weight Height)", f"{round(y_val, 1)} mm")
 
 
 import io
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageFont
-import pytz
 
-# --- IST TIME ZONE FIX ---
-ist = pytz.timezone("Asia/Kolkata")
-curr_dt = datetime.now(ist).strftime("%d-%b-%Y %I:%M:%S %p")
+# --- IST TIME ZONE FIX (WITHOUT PYTZ DEPENDENCY) ---
+ist_offset = timezone(timedelta(hours=5, minutes=30))
+curr_dt = datetime.now(ist_offset).strftime("%d-%b-%Y %I:%M:%S %p")
 
 struct_disp = selected_struct if "selected_struct" in locals() else "N/A"
 
@@ -247,11 +246,10 @@ st.markdown(
 saved = st.download_button(
     label="💾 SAVE IMG",
     data=buf.getvalue(),
-    file_name=f"ATD_Record_{datetime.now(ist).strftime('%Y%m%d_%H%M%S')}.png",
+    file_name=f"ATD_Record_{datetime.now(ist_offset).strftime('%Y%m%d_%H%M%S')}.png",
     mime="image/png",
     on_click=lambda: st.session_state.update({"img_downloaded": True}),
 )
 
 if st.session_state.get("img_downloaded"):
-    st.success("✅ Image Saved Successfully!")
-st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
+    st.success("✅ Image Saved Successfully!")st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
