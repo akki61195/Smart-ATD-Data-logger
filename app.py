@@ -1,4 +1,3 @@
-import streamlit as st
 import pandas as pd
 import requests
 from streamlit_geolocation import streamlit_geolocation
@@ -135,123 +134,66 @@ c1, c2 = st.columns(2)
 c1.metric("X (Pulley Gap)", f"{round(x_val, 1)} mm")
 c2.metric("Y (Weight Height)", f"{round(y_val, 1)} mm")
 
+st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
+import datetime
 
-import io
-from datetime import datetime, timezone, timedelta
-from PIL import Image, ImageDraw, ImageFont
+# --- SAVE RECORD BUTTONS WITH TIMESTAMP ---
+st.markdown("### 💾 Save Record")
 
-# --- IST TIME ZONE (WITHOUT EXTRA LIBRARIES) ---
-ist_offset = timezone(timedelta(hours=5, minutes=30))
-curr_dt = datetime.now(ist_offset).strftime("%d-%b-%Y %I:%M:%S %p")
+col_pdf, col_img = st.columns(2)
 
-struct_disp = selected_struct if "selected_struct" in locals() else "N/A"
+with col_pdf:
+    # Standard PDF/CSV download button
+    st.download_button(
+        label="📄 Save Record as PDF / Data",
+        data=export_df.to_csv(index=False),
+        file_name=f"ATD_Record_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv"
+    )
 
-# 3x Scaling for Ultra HD Quality
-scale = 3
-width, height = 900 * scale, 550 * scale
-img = Image.new("RGB", (width, height), color="#050a0f")
-draw = ImageDraw.Draw(img)
+with col_img:
+    # Client-side Image Capture button with Date & Time stamp
+    st.components.v1.html("""
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+        <script>
+        function captureWithTimestamp() {
+            var el = window.parent.document.querySelector('.stApp') || window.parent.document.body;
+            
+            // Current Date & Time String
+            var now = new Date();
+            var timeString = "Saved on: " + now.toLocaleDateString() + " at " + now.toLocaleTimeString();
 
-try:
-    font_title = ImageFont.load_default(size=25 * scale)
-    font_body = ImageFont.load_default(size=17 * scale)
-    font_val = ImageFont.load_default(size=20 * scale)
-except Exception:
-    font_title = font_body = font_val = ImageFont.load_default()
+            // Temporary Timestamp Watermark Banner
+            var watermark = window.parent.document.createElement('div');
+            watermark.id = "temp-timestamp-watermark";
+            watermark.innerText = timeString;
+            watermark.style.cssText = 'text-align: center; color: #00E5FF; padding: 10px; font-weight: bold; font-family: sans-serif; background: #050a0f; border-top: 1px solid #1b263b;';
+            
+            el.appendChild(watermark);
 
-# Outer Border & Title Header
-draw.rectangle(
-    [20 * scale, 20 * scale, width - 20 * scale, height - 20 * scale],
-    outline="#00d4ff",
-    width=5 * scale,
-)
-draw.text(
-    (40 * scale, 40 * scale),
-    "⚡ OHE ATD SMART TOOL RECORD",
-    fill="#00d4ff",
-    font=font_title,
-)
-draw.line(
-    [(40 * scale, 100 * scale), (width - 40 * scale, 100 * scale)],
-    fill="#00d4ff",
-    width=3 * scale,
-)
-
-# Text Content Lines
-lines = [
-    f"📅 Date & Time: {curr_dt}",
-    f"📍 Location / Section: {st.session_state.area_name[:40]}",
-    f"🏗️ Structure No: {struct_disp}",
-    f"📏 Tension Length (L): {L} m",
-    f"🌡️ Temperature: {theta_2} °C",
-]
-
-y_off = 120 * scale
-for line in lines:
-    draw.text((40 * scale, y_off), line, fill="#ffffff", font=font_body)
-    y_off += 42 * scale
-
-# X & Y Output Box
-draw.rectangle(
-    [40 * scale, 360 * scale, width - 40 * scale, 500 * scale],
-    fill="#1c2128",
-    outline="#00ff41",
-    width=4 * scale,
-)
-draw.text(
-    (60 * scale, 380 * scale),
-    f"Calculated X Value : {x_val:.0f} mm",
-    fill="#00ff41",
-    font=font_val,
-)
-draw.text(
-    (60 * scale, 435 * scale),
-    f"Calculated Y Value : {y_val:.0f} mm",
-    fill="#00ff41",
-    font=font_val,
-)
-
-# PNG Buffer Export
-buf = io.BytesIO()
-img.save(buf, format="PNG")
-
-# --- CENTERED STYLED BUTTON ---
-st.markdown(
-    """
-    <style>
-    div[data-testid="stDownloadButton"] {
-        display: flex;
-        justify-content: center;
-        margin-top: 15px;
-    }
-    div[data-testid="stDownloadButton"] > button {
-        background-color: #002b49 !important;
-        color: #ccff00 !important;
-        border: 2px solid #00d4ff !important;
-        font-weight: bold !important;
-        font-size: 18px !important;
-        width: 240px !important;
-        height: 50px !important;
-        border-radius: 8px !important;
-    }
-    div[data-testid="stDownloadButton"] > button:hover {
-        background-color: #004070 !important;
-        color: #ffffff !important;
-    }
-    </style>
-""",
-    unsafe_allow_html=True,
-)
-
-saved = st.download_button(
-    label="💾 SAVE IMG",
-    data=buf.getvalue(),
-    file_name=f"ATD_Record_{datetime.now(ist_offset).strftime('%Y%m%d_%H%M%S')}.png",
-    mime="image/png",
-)
-
-if saved:
-    st.success("✅ Image Saved Successfully!")
-
-if st.session_state.get("img_downloaded"):
-    st.success("✅ Image Saved Successfully!")st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
+            // Screen Capture
+            html2canvas(el, { backgroundColor: '#050a0f' }).then(function(canvas) {
+                var a = document.createElement('a');
+                a.download = 'ATD_Record_' + now.toISOString().slice(0,10) + '.png';
+                a.href = canvas.toDataURL('image/png');
+                a.click();
+                
+                // Remove watermark after taking screenshot
+                watermark.remove();
+            });
+        }
+        </script>
+        <button onclick="captureWithTimestamp()" style="
+            width: 100%;
+            background-color: #00E5FF;
+            color: #050a0f;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: sans-serif;">
+            📷 Save Record as Image (PNG)
+        </button>
+    """, height=45)
