@@ -6,54 +6,21 @@ from streamlit_geolocation import streamlit_geolocation
 # --- 1. PAGE SETUP & CONFIGURATION ---
 st.set_page_config(page_title="OHE ATD Smart Tool", page_icon="⚡", layout="centered")
 
-# Custom CSS for styling
 st.markdown("""
     <style>
-    .stApp { 
-        background-color: #050a0f; 
-        color: white; 
-    }
+    .stApp { background-color: #050a0f; color: white; }
     .area-box { 
-        padding: 15px; 
-        background-color: #1c2128; 
-        border: 2px solid #00d4ff; 
-        border-radius: 12px; 
-        text-align: center;
-        margin: 15px 0px;
+        padding: 15px; background-color: #1c2128; border: 2px solid #00d4ff; 
+        border-radius: 12px; text-align: center; margin: 15px 0px; 
     }
-    .area-label { 
-        color: #00d4ff; 
-        font-size: 14px; 
-        margin-bottom: 2px; 
-        font-weight: bold; 
-    }
-    .area-text { 
-        font-size: 18px; 
-        font-weight: bold; 
-        color: #ffffff; 
-    }
+    .area-label { color: #00d4ff; font-size: 14px; margin-bottom: 2px; font-weight: bold; }
+    .area-text { font-size: 18px; font-weight: bold; color: #ffffff; }
     .length-display {
-        font-size: 24px !important;
-        font-weight: bold;
-        color: #00ff41;
-        padding: 12px;
-        background: #1c2128;
-        border-radius: 8px;
-        border-left: 8px solid #00ff41;
-        margin: 10px 0px;
+        font-size: 20px !important; font-weight: bold; color: #00ff41; padding: 12px;
+        background: #1c2128; border-radius: 8px; border-left: 6px solid #00ff41; margin: 10px 0px;
     }
-    div[data-testid="stMetricValue"] > div { 
-        color: #00ff41 !important; 
-        font-weight: 800; 
-        font-size: 32px !important; 
-    }
-    .stButton>button {
-        background-color: #00d4ff !important;
-        color: black !important;
-        font-weight: bold;
-        border-radius: 8px;
-        width: 100%;
-    }
+    div[data-testid="stMetricValue"] > div { color: #00ff41 !important; font-weight: 800; font-size: 32px !important; }
+    .stButton>button { background-color: #00d4ff !important; color: black !important; font-weight: bold; border-radius: 8px; width: 100%; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -63,20 +30,26 @@ if "temp_val" not in st.session_state:
 if "area_name" not in st.session_state:
     st.session_state.area_name = "Not Selected / Manual Mode"
 
-SHEET_URL = ""  # Add your CSV or Google Sheet URL here if available
+# --- 3. GOOGLE SHEET / CSV INPUT (FEATURE 1) ---
+st.sidebar.header("⚙️ Data Source & Sheet")
+sheet_url_input = st.sidebar.text_input("📊 Enter CSV / Google Sheet Link", value="")
 
 @st.cache_data
-def load_sheet_data():
-    if not SHEET_URL:
+def load_sheet_data(url):
+    if not url:
         return None
     try:
-        df = pd.read_csv(SHEET_URL)
+        # Convert Google Sheet view link to CSV export link if needed
+        if "docs.google.com/spreadsheets" in url and "export?format=csv" not in url:
+            url = url.split('/edit')[0] + '/export?format=csv'
+        df = pd.read_csv(url)
         df.columns = df.columns.str.strip()
         return df
-    except Exception:
+    except Exception as e:
+        st.sidebar.error(f"Error loading sheet: {e}")
         return None
 
-# --- 3. WEATHER & AREA ENGINE ---
+# --- 4. WEATHER & LOCATION ENGINE (FEATURE 2) ---
 def get_weather_by_coords(lat, lon):
     try:
         w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
@@ -97,60 +70,79 @@ def get_manual_city_data(city_name):
     except Exception:
         return 35.0, "Network Error"
 
-# --- 4. HEADER ---
+# --- 5. HEADER ---
 st.markdown("<h2 style='text-align: center; color: #00d4ff;'>⚡ OHE ATD Smart Tool</h2>", unsafe_allow_html=True)
 
-df = load_sheet_data()
+# Load Sheet
+df = load_sheet_data(sheet_url_input)
 
-# --- 5. STRUCTURE & LENGTH DISPLAY ---
-if df is not None and 'Structure_No' in df.columns:
-    struct_list = df['Structure_No'].dropna().unique().tolist()
-    selected_struct = st.selectbox("📍 Select Structure No", ["Manual Entry"] + struct_list)
+# --- 6. STRUCTURE LOCATION & TENSION LENGTH (CSV FEATURE) ---
+st.subheader("📍 Structure Location & Tension Length")
+
+if df is not None:
+    # Try finding Structure Column
+    struct_col = [c for c in df.columns if 'struct' in c.lower() or 'loc' in c.lower()]
+    length_col = [c for c in df.columns if 'length' in c.lower() or 'tension' in c.lower() or c.lower() == 'l']
     
-    if selected_struct != "Manual Entry":
-        L = float(df[df['Structure_No'] == selected_struct]['Tension_Length'].values[0])
-        st.markdown(f"<div class='length-display'>Tension Length (L): {L} m</div>", unsafe_allow_html=True)
+    if struct_col and length_col:
+        struct_col_name = struct_col[0]
+        length_col_name = length_col[0]
+        
+        struct_list = df[struct_col_name].dropna().astype(str).unique().tolist()
+        selected_struct = st.selectbox("Select Structure No / Location from CSV:", ["Manual Entry"] + struct_list)
+        
+        if selected_struct != "Manual Entry":
+            L = float(df[df[struct_col_name].astype(str) == selected_struct][length_col_name].values[0])
+            st.markdown(f"<div class='length-display'>✅ Tension Length (L) from Sheet: {L} m</div>", unsafe_allow_html=True)
+        else:
+            L = st.number_input("Enter Tension Length (L) manually (meters)", value=750.0)
     else:
-        L = st.number_input("Enter Tension Length (L) manually", value=750.0)
+        st.warning("⚠️ Sheet detected, but 'Structure_No' or 'Tension_Length' columns missing.")
+        L = st.number_input("Enter Tension Length (L) manually (meters)", value=750.0)
 else:
-    L = st.number_input("Enter Tension Length (L) manually", value=750.0)
+    st.info("ℹ️ Enter CSV / Google Sheet Link in the sidebar to auto-fetch Structure Location & Length.")
+    L = st.number_input("Enter Tension Length (L) manually (meters)", value=750.0)
 
 st.divider()
 
-# --- 6. LOCATION MODE ---
-manual_loc = st.checkbox("✍️ Enter Location Manually")
+# --- 7. GPS LOCATION & TEMP FETCH ---
+st.subheader("🛰️ GPS Location & Temperature Fetch")
 
-if manual_loc:
-    city_input = st.text_input("Enter City Name (e.g. Kodinar, Junagadh)", value="Kodinar")
-    if st.button("🔍 FETCH TEMP FOR THIS CITY"):
-        with st.spinner('Fetching data...'):
-            t, a = get_manual_city_data(city_input)
-            st.session_state.temp_val = t
-            st.session_state.area_name = a
-else:
-    st.write("🛰️ GPS Mode")
-    location = streamlit_geolocation()
+location = streamlit_geolocation()
 
+col_gps, col_city = st.columns(2)
+
+with col_gps:
     if location and location.get('latitude'):
-        if st.button("🌡️ SYNC LIVE AREA & TEMP"):
-            with st.spinner('Syncing...'):
+        if st.button("🌡️ FETCH TEMP FROM GPS"):
+            with st.spinner('Fetching GPS Temperature...'):
                 try:
                     lat, lon = location['latitude'], location['longitude']
                     t = get_weather_by_coords(lat, lon)
                     g_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
                     g_res = requests.get(g_url, headers={'User-Agent': 'RailwayTool'}, timeout=5).json()
-                    a = g_res.get('display_name', 'Local Section')
+                    a = g_res.get('display_name', 'GPS Location Detected')
                     
                     st.session_state.temp_val = t
                     st.session_state.area_name = a
-                    st.success("✅ Data Updated!")
+                    st.success("✅ GPS Data Fetched!")
                 except Exception:
-                    st.error("Failed to sync GPS data.")
+                    st.error("Error fetching GPS data.")
 
-# --- 7. DISPLAY & RESULTS ---
+with col_city:
+    with st.expander("✍️ Search Temp by City"):
+        city_input = st.text_input("City Name", value="Kodinar")
+        if st.button("🔍 SEARCH CITY TEMP"):
+            with st.spinner('Searching...'):
+                t, a = get_manual_city_data(city_input)
+                st.session_state.temp_val = t
+                st.session_state.area_name = a
+                st.success("✅ City Temp Fetched!")
+
+# --- 8. DISPLAY & RESULTS ---
 st.markdown(f"""
     <div class="area-box">
-        <div class="area-label">📡 ACTIVE SECTION</div>
+        <div class="area-label">📡 ACTIVE LOCATION / SECTION</div>
         <div class="area-text">{st.session_state.area_name}</div>
     </div>
 """, unsafe_allow_html=True)
@@ -162,8 +154,8 @@ delta = L * 0.000017 * (35 - theta_2) * 1000
 x_val = 1300 + delta
 y_val = 2300 + (3 * delta)
 
-col1, col2 = st.columns(2)
-with col1:
+res_col1, res_col2 = st.columns(2)
+with res_col1:
     st.metric(label="Calculated X Value", value=f"{x_val:.0f} mm")
-with col2:
+with res_col2:
     st.metric(label="Calculated Y Value", value=f"{y_val:.0f} mm")
