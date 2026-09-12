@@ -140,7 +140,7 @@ import io
 from datetime import datetime, timezone, timedelta
 from PIL import Image, ImageDraw, ImageFont
 
-# --- IST TIME ZONE FIX (WITHOUT PYTZ DEPENDENCY) ---
+# --- IST TIME ZONE (WITHOUT EXTRA LIBRARIES) ---
 ist_offset = timezone(timedelta(hours=5, minutes=30))
 curr_dt = datetime.now(ist_offset).strftime("%d-%b-%Y %I:%M:%S %p")
 
@@ -177,7 +177,7 @@ draw.line(
     width=3 * scale,
 )
 
-# Text Content Lines with Location and Structure No.
+# Text Content Lines
 lines = [
     f"📅 Date & Time: {curr_dt}",
     f"📍 Location / Section: {st.session_state.area_name[:40]}",
@@ -215,7 +215,7 @@ draw.text(
 buf = io.BytesIO()
 img.save(buf, format="PNG")
 
-# --- CENTERED STYLED BUTTON & SUCCESS MESSAGE ---
+# --- CENTERED STYLED BUTTON ---
 st.markdown(
     """
     <style>
@@ -248,8 +248,10 @@ saved = st.download_button(
     data=buf.getvalue(),
     file_name=f"ATD_Record_{datetime.now(ist_offset).strftime('%Y%m%d_%H%M%S')}.png",
     mime="image/png",
-    on_click=lambda: st.session_state.update({"img_downloaded": True}),
 )
+
+if saved:
+    st.success("✅ Image Saved Successfully!")
 
 if st.session_state.get("img_downloaded"):
     st.success("✅ Image Saved Successfully!")st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
