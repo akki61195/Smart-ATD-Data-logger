@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 import requests
 from streamlit_geolocation import streamlit_geolocation
@@ -135,65 +136,3 @@ c1.metric("X (Pulley Gap)", f"{round(x_val, 1)} mm")
 c2.metric("Y (Weight Height)", f"{round(y_val, 1)} mm")
 
 st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
-import datetime
-
-# --- SAVE RECORD BUTTONS WITH TIMESTAMP ---
-st.markdown("### 💾 Save Record")
-
-col_pdf, col_img = st.columns(2)
-
-with col_pdf:
-    # Standard PDF/CSV download button
-    st.download_button(
-        label="📄 Save Record as PDF / Data",
-        data=export_df.to_csv(index=False),
-        file_name=f"ATD_Record_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv"
-    )
-
-with col_img:
-    # Client-side Image Capture button with Date & Time stamp
-    st.components.v1.html("""
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-        <script>
-        function captureWithTimestamp() {
-            var el = window.parent.document.querySelector('.stApp') || window.parent.document.body;
-            
-            // Current Date & Time String
-            var now = new Date();
-            var timeString = "Saved on: " + now.toLocaleDateString() + " at " + now.toLocaleTimeString();
-
-            // Temporary Timestamp Watermark Banner
-            var watermark = window.parent.document.createElement('div');
-            watermark.id = "temp-timestamp-watermark";
-            watermark.innerText = timeString;
-            watermark.style.cssText = 'text-align: center; color: #00E5FF; padding: 10px; font-weight: bold; font-family: sans-serif; background: #050a0f; border-top: 1px solid #1b263b;';
-            
-            el.appendChild(watermark);
-
-            // Screen Capture
-            html2canvas(el, { backgroundColor: '#050a0f' }).then(function(canvas) {
-                var a = document.createElement('a');
-                a.download = 'ATD_Record_' + now.toISOString().slice(0,10) + '.png';
-                a.href = canvas.toDataURL('image/png');
-                a.click();
-                
-                // Remove watermark after taking screenshot
-                watermark.remove();
-            });
-        }
-        </script>
-        <button onclick="captureWithTimestamp()" style="
-            width: 100%;
-            background-color: #00E5FF;
-            color: #050a0f;
-            font-weight: bold;
-            border: none;
-            border-radius: 8px;
-            padding: 10px;
-            cursor: pointer;
-            font-size: 14px;
-            font-family: sans-serif;">
-            📷 Save Record as Image (PNG)
-        </button>
-    """, height=45)
