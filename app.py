@@ -135,33 +135,35 @@ c1, c2 = st.columns(2)
 c1.metric("X (Pulley Gap)", f"{round(x_val, 1)} mm")
 c2.metric("Y (Weight Height)", f"{round(y_val, 1)} mm")
 
-st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
 
 import io
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
-# --- CLEAN SAVE IMAGE BUTTON ONLY ---
+# --- HIGH QUALITY IMAGE CARD GENERATOR ---
 
-# Current Timestamp for Stamp & Filename
 curr_dt = datetime.now().strftime("%d-%b-%Y %I:%M:%S %p")
 
-# Create Image Card directly in memory
-img = Image.new("RGB", (800, 500), color="#050a0f")
+# 1. Image Quality Increase (Super Sampling 2x for HD Sharp Text)
+scale = 2
+width, height = 900 * scale, 550 * scale
+img = Image.new("RGB", (width, height), color="#050a0f")
 draw = ImageDraw.Draw(img)
 
+# Font Sizing for High Resolution
 try:
-    font_title = ImageFont.truetype("arial.ttf", 32)
-    font_body = ImageFont.truetype("arial.ttf", 24)
-    font_val = ImageFont.truetype("arial.ttf", 28)
+    font_title = ImageFont.truetype("arial.ttf", 36 * scale)
+    font_body = ImageFont.truetype("arial.ttf", 24 * scale)
+    font_val = ImageFont.truetype("arial.ttf", 30 * scale)
 except IOError:
     font_title = font_body = font_val = ImageFont.load_default()
 
-# Layout Design
-draw.rectangle([10, 10, 790, 490], outline="#00d4ff", width=4)
-draw.text((30, 30), "⚡ OHE ATD SMART TOOL RECORD", fill="#00d4ff", font=font_title)
-draw.line([(30, 80), (770, 80)], fill="#00d4ff", width=2)
+# Outer Border & Title Header
+draw.rectangle([15 * scale, 15 * scale, width - 15 * scale, height - 15 * scale], outline="#00d4ff", width=4 * scale)
+draw.text((35 * scale, 35 * scale), "⚡ OHE ATD SMART TOOL RECORD", fill="#00d4ff", font=font_title)
+draw.line([(35 * scale, 90 * scale), (width - 35 * scale, 90 * scale)], fill="#00d4ff", width=2 * scale)
 
+# Data Content
 lines = [
     f"📅 Date & Time: {curr_dt}",
     f"📍 Location / Section: {st.session_state.area_name[:40]}",
@@ -169,26 +171,48 @@ lines = [
     f"🌡️ Temperature: {theta_2} °C",
 ]
 
-y_off = 110
+y_off = 120 * scale
 for line in lines:
-    draw.text((30, y_off), line, fill="#ffffff", font=font_body)
-    y_off += 45
+    draw.text((35 * scale, y_off), line, fill="#ffffff", font=font_body)
+    y_off += 45 * scale
 
-draw.rectangle([30, 310, 770, 460], fill="#1c2128", outline="#00ff41", width=2)
-draw.text((50, 330), f"Calculated X Value : {x_val:.0f} mm", fill="#00ff41", font=font_val)
-draw.text((50, 390), f"Calculated Y Value : {y_val:.0f} mm", fill="#00ff41", font=font_val)
+# X & Y Output Box
+draw.rectangle([35 * scale, 340 * scale, width - 35 * scale, 500 * scale], fill="#1c2128", outline="#00ff41", width=3 * scale)
+draw.text((60 * scale, 365 * scale), f"Calculated X Value : {x_val:.0f} mm", fill="#00ff41", font=font_val)
+draw.text((60 * scale, 430 * scale), f"Calculated Y Value : {y_val:.0f} mm", fill="#00ff41", font=font_val)
 
-# Convert to Buffer
+# PNG Buffer Export
 buf = io.BytesIO()
-img.save(buf, format="PNG")
+img.save(buf, format="PNG", optimize=True)
 
-# Render Only the Compact Button
-col_btn, _ = st.columns([1, 2])
-with col_btn:
-    st.download_button(
-        label="📥 Save Image",
-        data=buf.getvalue(),
-        file_name=f"ATD_Record_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
-        mime="image/png",
-        use_container_width=False
-    )
+# --- 2. CENTERED BUTTON WITH CUSTOM STYLING ---
+st.markdown("""
+    <style>
+    div[data-testid="stDownloadButton"] {
+        display: flex;
+        justify-content: center;
+    }
+    div[data-testid="stDownloadButton"] > button {
+        background-color: #002b49 !important; /* Dark Blue */
+        color: #ccff00 !important;             /* Lime Yellow/Green */
+        border: 2px solid #00d4ff !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        width: 220px !important;
+        border-radius: 8px !important;
+    }
+    div[data-testid="stDownloadButton"] > button:hover {
+        background-color: #004070 !important;
+        color: #ffffff !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.download_button(
+    label="💾 SAVE IMG",
+    data=buf.getvalue(),
+    file_name=f"ATD_Record_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+    mime="image/png"
+)
+
+st.markdown(f"<div style='text-align: center; font-size: 10px; margin-top: 40px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
