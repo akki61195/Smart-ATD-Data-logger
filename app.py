@@ -141,59 +141,54 @@ import io
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
-# --- SAVE BUTTON & TIMESTAMP FEATURE ---
-st.subheader("💾 Save & Download Processed Image")
+# --- CLEAN SAVE IMAGE BUTTON ONLY ---
 
-uploaded_file = st.file_uploader(
-    "Upload an Image to Stamp & Save", type=["jpg", "jpeg", "png"]
-)
+# Current Timestamp for Stamp & Filename
+curr_dt = datetime.now().strftime("%d-%b-%Y %I:%M:%S %p")
 
-if uploaded_file is not None:
-    # Open original image
-    img = Image.open(uploaded_file).convert("RGB")
-    draw = ImageDraw.Draw(img)
+# Create Image Card directly in memory
+img = Image.new("RGB", (800, 500), color="#050a0f")
+draw = ImageDraw.Draw(img)
 
-    # Get current timestamp
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    stamp_text = f"Stamped: {current_time}"
+try:
+    font_title = ImageFont.truetype("arial.ttf", 32)
+    font_body = ImageFont.truetype("arial.ttf", 24)
+    font_val = ImageFont.truetype("arial.ttf", 28)
+except IOError:
+    font_title = font_body = font_val = ImageFont.load_default()
 
-    # Calculate text size and position (Bottom Right Corner)
-    width, height = img.size
-    font_size = max(20, int(height * 0.03))  # Dynamic font sizing
+# Layout Design
+draw.rectangle([10, 10, 790, 490], outline="#00d4ff", width=4)
+draw.text((30, 30), "⚡ OHE ATD SMART TOOL RECORD", fill="#00d4ff", font=font_title)
+draw.line([(30, 80), (770, 80)], fill="#00d4ff", width=2)
 
-    try:
-        font = ImageFont.truetype("arial.ttf", font_size)
-    except IOError:
-        font = ImageFont.load_default()
+lines = [
+    f"📅 Date & Time: {curr_dt}",
+    f"📍 Location / Section: {st.session_state.area_name[:40]}",
+    f"📏 Tension Length (L): {L} m",
+    f"🌡️ Temperature: {theta_2} °C",
+]
 
-    # Draw semi-transparent background box for timestamp
-    padding = 10
-    box_width = font_size * len(stamp_text) * 0.6
-    box_height = font_size + padding
-    x_pos = width - box_width - 20
-    y_pos = height - box_height - 20
+y_off = 110
+for line in lines:
+    draw.text((30, y_off), line, fill="#ffffff", font=font_body)
+    y_off += 45
 
-    draw.rectangle(
-        [x_pos, y_pos, x_pos + box_width, y_pos + box_height], fill=(0, 0, 0)
-    )
-    draw.text(
-        (x_pos + 5, y_pos + 5), stamp_text, fill=(0, 255, 65), font=font
-    )  # Green text
+draw.rectangle([30, 310, 770, 460], fill="#1c2128", outline="#00ff41", width=2)
+draw.text((50, 330), f"Calculated X Value : {x_val:.0f} mm", fill="#00ff41", font=font_val)
+draw.text((50, 390), f"Calculated Y Value : {y_val:.0f} mm", fill="#00ff41", font=font_val)
 
-    # Show preview in app
-    st.image(
-        img, caption="Preview with Timestamp", use_container_width=True
-    )
+# Convert to Buffer
+buf = io.BytesIO()
+img.save(buf, format="PNG")
 
-    # Convert Image to Byte Buffer for Download
-    buf = io.BytesIO()
-    img.save(buf, format="JPEG", quality=95)
-    byte_im = buf.getvalue()
-
-    # Streamlit Save/Download Button
+# Render Only the Compact Button
+col_btn, _ = st.columns([1, 2])
+with col_btn:
     st.download_button(
-        label="📥 SAVE IMAGE WITH TIMESTAMP",
-        data=byte_im,
-        file_name=f"ATD_Record_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
-        mime="image/jpeg",
+        label="📥 Save Image",
+        data=buf.getvalue(),
+        file_name=f"ATD_Record_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png",
+        mime="image/png",
+        use_container_width=False
     )
