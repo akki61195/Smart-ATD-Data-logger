@@ -8,12 +8,14 @@ import requests
 import streamlit as st
 from streamlit_geolocation import streamlit_geolocation
 
-# --- 1. PAGE SETUP & ULTRA-COMPACT MOBILE CSS ---
+# --- 1. PAGE SETUP & THEME INITIALIZATION ---
 st.set_page_config(page_title="OHE ATD Smart Tool", page_icon="⚡", layout="centered")
 
-dark_mode = st.toggle("🌙 Dark Mode", value=True)
+if "dark_mode" not in st.session_state:
+  st.session_state.dark_mode = True
 
-if dark_mode:
+# Theme Colors
+if st.session_state.dark_mode:
   bg_color = "#050a0f"
   text_color = "#ffffff"
   card_bg = "#161b22"
@@ -30,19 +32,19 @@ st.markdown(
     f"""
     <style>
     .block-container {{
-        padding-top: 1rem !important;
+        padding-top: 0.5rem !important;
         padding-bottom: 1rem !important;
         padding-left: 0.8rem !important;
         padding-right: 0.8rem !important;
         max-width: 520px !important;
     }}
     .stApp {{ background-color: {bg_color}; color: {text_color}; }}
-    hr {{ margin: 8px 0px !important; }}
+    hr {{ margin: 6px 0px !important; }}
     div[data-testid="stVerticalBlock"] > div {{
         gap: 0.35rem !important;
     }}
     .area-box {{ 
-        padding: 6px 12px; 
+        padding: 6px 10px; 
         background-color: {card_bg}; 
         border: 1px solid {border_accent}; 
         border-radius: 8px; 
@@ -52,10 +54,10 @@ st.markdown(
     .area-label {{ color: {border_accent}; font-size: 11px; font-weight: bold; }}
     .area-text {{ font-size: 13px; font-weight: 600; color: {text_color}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
     .length-display {{
-        font-size: 18px !important;
+        font-size: 17px !important;
         font-weight: bold;
         color: {calc_val_color};
-        padding: 6px 12px;
+        padding: 6px 10px;
         background: {card_bg};
         border-radius: 6px;
         border-left: 5px solid {calc_val_color};
@@ -94,10 +96,27 @@ st.markdown(
         font-size: 12px !important;
         margin-bottom: -4px !important;
     }}
+    div[data-testid="stToggle"] {{
+        margin-top: 4px !important;
+    }}
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+# --- HEADER WITH VISIBLE THEME TOGGLE ---
+h_col1, h_col2 = st.columns([2.2, 1])
+with h_col1:
+  st.markdown(
+      f"<h3 style='color: {border_accent}; margin: 0px;'>⚡ OHE ATD Smart"
+      " Tool</h3>",
+      unsafe_allow_html=True,
+  )
+with h_col2:
+  is_dark = st.toggle("🌙 Dark", value=st.session_state.dark_mode)
+  if is_dark != st.session_state.dark_mode:
+    st.session_state.dark_mode = is_dark
+    st.rerun()
 
 # --- 2. DATA LOADING ---
 SHEET_ID = "1vfioGSmpC7a5S8SMUpCk9xn-mtttvcTecLEQ1Sd6XkU"
@@ -144,13 +163,7 @@ def fetch_city_weather(city_name):
     return 35.0, "Network Error"
 
 
-# --- 4. TITLE & SESSION STATE INITIALIZATION ---
-st.markdown(
-    f"<h3 style='text-align: center; color: {border_accent}; margin: 0px 0px"
-    " 6px 0px;'>⚡ OHE ATD Smart Tool</h3>",
-    unsafe_allow_html=True,
-)
-
+# --- 4. SESSION STATE INITIALIZATION ---
 if "current_temp" not in st.session_state:
   st.session_state.current_temp = 35.0
 if "temp_sync_ver" not in st.session_state:
@@ -247,7 +260,6 @@ st.markdown(
 col_slim_therm, col_temp_controls = st.columns([0.45, 1.55])
 
 with col_temp_controls:
-  # Dynamic key ensures Streamlit widget updates instantly on fetch/sync
   theta_2 = st.number_input(
       "Ambient Temp (°C)",
       value=float(st.session_state.current_temp),
@@ -349,7 +361,7 @@ with col_slim_therm:
     """
   st.components.v1.html(thermometer_html, height=92)
 
-# --- 8. CALCULATION & COMPACT VALUES ---
+# --- 8. CALCULATION & VALUES ---
 delta = L * 0.000017 * (35 - theta_2) * 1000
 x_val, y_val = 1300 + delta, 2300 + (3 * delta)
 
