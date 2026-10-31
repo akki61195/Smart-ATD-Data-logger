@@ -29,7 +29,6 @@ else:
 st.markdown(
     f"""
     <style>
-    /* Global Spacing Reductions for Single Mobile Screen */
     .block-container {{
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
@@ -42,8 +41,6 @@ st.markdown(
     div[data-testid="stVerticalBlock"] > div {{
         gap: 0.35rem !important;
     }}
-    
-    /* Compact Section Banner */
     .area-box {{ 
         padding: 6px 12px; 
         background-color: {card_bg}; 
@@ -54,8 +51,6 @@ st.markdown(
     }}
     .area-label {{ color: {border_accent}; font-size: 11px; font-weight: bold; }}
     .area-text {{ font-size: 13px; font-weight: 600; color: {text_color}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-    
-    /* Compact Tension Length */
     .length-display {{
         font-size: 18px !important;
         font-weight: bold;
@@ -67,8 +62,6 @@ st.markdown(
         margin: 2px 0px;
         text-align: center;
     }}
-    
-    /* Compact Metric Boxes */
     .metric-calc-box {{
         background: {card_bg};
         border: 1px solid {border_accent};
@@ -88,8 +81,6 @@ st.markdown(
         color: {calc_val_color};
         line-height: 1.2;
     }}
-    
-    /* Buttons tightening */
     .stButton>button {{
         background-color: {border_accent} !important;
         color: black !important;
@@ -123,11 +114,11 @@ def load_sheet_data():
     return None
 
 
-# --- 3. WEATHER & GEO ENGINE ---
+# --- 3. ROBUST WEATHER & GEO ENGINE ---
 def fetch_weather(lat, lon):
   try:
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}¤t=temperature_2m¤t_weather=true"
-    res = requests.get(url, timeout=5).json()
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m&current_weather=true"
+    res = requests.get(url, timeout=6).json()
     if "current" in res and "temperature_2m" in res["current"]:
       return round(float(res["current"]["temperature_2m"]), 1)
     elif "current_weather" in res and "temperature" in res["current_weather"]:
@@ -141,7 +132,7 @@ def fetch_city_weather(city_name):
   try:
     geo_url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city_name)}&format=json&limit=1"
     res = requests.get(
-        geo_url, headers={"User-Agent": "OHE_Railway_ATD_Tool"}, timeout=5
+        geo_url, headers={"User-Agent": "OHE_Railway_ATD_Tool"}, timeout=6
     ).json()
     if res and len(res) > 0:
       lat = float(res[0]["lat"])
@@ -153,7 +144,7 @@ def fetch_city_weather(city_name):
     return 35.0, "Network Error"
 
 
-# --- 4. TITLE & STATE ---
+# --- 4. TITLE & SESSION STATE INITIALIZATION ---
 st.markdown(
     f"<h3 style='text-align: center; color: {border_accent}; margin: 0px 0px"
     " 6px 0px;'>⚡ OHE ATD Smart Tool</h3>",
@@ -162,6 +153,8 @@ st.markdown(
 
 if "current_temp" not in st.session_state:
   st.session_state.current_temp = 35.0
+if "temp_sync_ver" not in st.session_state:
+  st.session_state.temp_sync_ver = 0
 if "area_name" not in st.session_state:
   st.session_state.area_name = "GPS Not Active"
 
@@ -192,7 +185,7 @@ else:
       "Tension Length (L)", value=750.0, step=10.0, format="%.1f"
   )
 
-# --- 6. TIGHT LOCATION & GPS ROW ---
+# --- 6. LOCATION & GPS ROW ---
 col_loc_type, col_loc_action = st.columns([1, 1.8])
 with col_loc_type:
   manual_loc = st.checkbox("Manual City", value=False)
@@ -208,7 +201,7 @@ if manual_loc:
       with st.spinner(".."):
         t, a = fetch_city_weather(city_input)
         st.session_state.current_temp = float(t)
-        st.session_state.temp_input_val = float(t)
+        st.session_state.temp_sync_ver += 1
         st.session_state.area_name = a
         st.rerun()
 else:
@@ -223,12 +216,12 @@ else:
           lon = location["longitude"]
           live_temp = fetch_weather(lat, lon)
           st.session_state.current_temp = float(live_temp)
-          st.session_state.temp_input_val = float(live_temp)
+          st.session_state.temp_sync_ver += 1
 
           try:
             g_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
             g_res = requests.get(
-                g_url, headers={"User-Agent": "OHE_Railway_ATD_Tool"}, timeout=5
+                g_url, headers={"User-Agent": "OHE_Railway_ATD_Tool"}, timeout=6
             ).json()
             st.session_state.area_name = g_res.get(
                 "display_name", f"{lat:.2f}, {lon:.2f}"
@@ -237,7 +230,7 @@ else:
             st.session_state.area_name = f"{lat:.2f}, {lon:.2f}"
           st.rerun()
       else:
-        st.toast("⚠️ Pehle ⌖ par tap karke location allow karein!", icon="📍")
+        st.toast("⚠️ Pehle ⌖ icon dabayein, phir Sync dabayein!", icon="📍")
 
 # Active Section Pill
 st.markdown(
@@ -246,30 +239,24 @@ st.markdown(
         <span class="area-label">📡 SECTION: </span>
         <span class="area-text">{st.session_state.area_name}</span>
     </div>
-""",
+    """,
     unsafe_allow_html=True,
 )
 
-# --- 7. SLIM VERTICAL THERMOMETER & TEMPERATURE INPUT ---
-if "temp_input_val" not in st.session_state:
-  st.session_state.temp_input_val = st.session_state.current_temp
-
+# --- 7. SLIM VERTICAL THERMOMETER & TEMPERATURE DISPLAY ---
 col_slim_therm, col_temp_controls = st.columns([0.45, 1.55])
 
 with col_temp_controls:
-
-  def on_temp_change():
-    st.session_state.current_temp = st.session_state.temp_input_val
-
+  # Dynamic key ensures Streamlit widget updates instantly on fetch/sync
   theta_2 = st.number_input(
       "Ambient Temp (°C)",
-      key="temp_input_val",
+      value=float(st.session_state.current_temp),
       step=0.5,
       min_value=-5.0,
       max_value=60.0,
-      on_change=on_temp_change,
+      key=f"temp_widget_{st.session_state.temp_sync_ver}",
   )
-  st.session_state.current_temp = theta_2
+  st.session_state.current_temp = float(theta_2)
 
   if theta_2 >= 40:
     temp_status = (
@@ -309,7 +296,6 @@ else:
   glow_color = "rgba(255, 51, 102, 0.5)"
 
 with col_slim_therm:
-  # Slim Vertical Along-side Thermometer Strip
   thermometer_html = f"""
     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 85px; background: {card_bg}; border-radius: 6px; border: 1px solid {border_accent}; padding: 4px 0px;">
         <style>
@@ -363,7 +349,7 @@ with col_slim_therm:
     """
   st.components.v1.html(thermometer_html, height=92)
 
-# --- 8. CALCULATION & VALUES (COMPACT GRID) ---
+# --- 8. CALCULATION & COMPACT VALUES ---
 delta = L * 0.000017 * (35 - theta_2) * 1000
 x_val, y_val = 1300 + delta, 2300 + (3 * delta)
 
@@ -464,7 +450,7 @@ draw.text(
 buf = io.BytesIO()
 img.save(buf, format="PNG")
 
-# --- 10. SAVE & SHARE BUTTONS (COMPACT ROW) ---
+# --- 10. SAVE & SHARE BUTTONS ---
 b64_img = base64.b64encode(buf.getvalue()).decode("utf-8")
 file_name_ts = (
     f"ATD_Record_{datetime.now(ist_offset).strftime('%Y%m%d_%H%M%S')}.png"
