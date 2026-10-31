@@ -94,7 +94,7 @@ def load_sheet_data():
 # --- 3. WEATHER & GEO ENGINE ---
 def fetch_weather(lat, lon):
     try:
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}¤t=temperature_2m¤t_weather=true"
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m&current_weather=true"
         res = requests.get(url, timeout=5).json()
         if 'current' in res and 'temperature_2m' in res['current']:
             return round(float(res['current']['temperature_2m']), 1)
@@ -120,8 +120,9 @@ def fetch_city_weather(city_name):
 # --- 4. UI INITIALIZATION ---
 st.markdown(f"<h2 style='text-align: center; color: {border_accent};'>OHE ATD Smart Tool</h2>", unsafe_allow_html=True)
 
-if 'temp_val' not in st.session_state: 
-    st.session_state.temp_val = 35.0
+# State initialization
+if 'current_temp' not in st.session_state: 
+    st.session_state.current_temp = 35.0
 if 'area_name' not in st.session_state: 
     st.session_state.area_name = "GPS Not Active"
 
@@ -149,7 +150,8 @@ if manual_loc:
     if st.button("🔍 FETCH TEMP FOR THIS CITY"):
         with st.spinner('Fetching data...'):
             t, a = fetch_city_weather(city_input)
-            st.session_state.temp_val = float(t)
+            st.session_state.current_temp = float(t)
+            st.session_state.temp_input_val = float(t)
             st.session_state.area_name = a
             st.rerun()
 else:
@@ -162,7 +164,10 @@ else:
                 lat = location['latitude']
                 lon = location['longitude']
                 live_temp = fetch_weather(lat, lon)
-                st.session_state.temp_val = float(live_temp)
+                
+                # Direct override both session state and widget state
+                st.session_state.current_temp = float(live_temp)
+                st.session_state.temp_input_val = float(live_temp)
 
                 try:
                     g_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
@@ -174,7 +179,7 @@ else:
         else:
             st.warning("⚠️ Pehle upar diye gaye GPS button ⌖ par tap karein, fir Sync dabayein.")
 
-# --- 7. DISPLAY & RESULTS (ANIMATED THERMOMETER + PROPER KEY BINDING) ---
+# --- 7. DISPLAY & RESULTS ---
 st.markdown(f"""
     <div class="area-box">
         <div class="area-label">📡 ACTIVE SECTION</div>
@@ -182,11 +187,28 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
+# Ensure widget state exists
+if 'temp_input_val' not in st.session_state:
+    st.session_state.temp_input_val = st.session_state.current_temp
+
 col_therm, col_input = st.columns([1.2, 1])
 
 with col_input:
-    # Key 'temp_val' ko direct use kiya hai jisse programmatic update se value change ho
-    theta_2 = st.number_input("Current Temp (°C)", key="temp_val", step=0.5, min_value=-5.0, max_value=60.0)
+    def on_temp_change():
+        st.session_state.current_temp = st.session_state.temp_input_val
+
+    theta_2 = st.number_input(
+        "Current Temp (°C)", 
+        key="temp_input_val", 
+        step=0.5, 
+        min_value=-5.0, 
+        max_value=60.0,
+        on_change=on_temp_change
+    )
+    
+    # Sync theta_2
+    st.session_state.current_temp = theta_2
+
     if theta_2 >= 40:
         temp_status = "<span style='color: #ff3366; font-weight: bold;'>🔥 High Ambient (Summer)</span>"
     elif theta_2 <= 15:
