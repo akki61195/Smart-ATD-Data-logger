@@ -8,13 +8,22 @@ import requests
 import streamlit as st
 from streamlit_geolocation import streamlit_geolocation
 
-# --- 1. PAGE SETUP & THEME INITIALIZATION ---
+# --- 1. PAGE SETUP ---
 st.set_page_config(page_title="OHE ATD Smart Tool", page_icon="⚡", layout="centered")
 
+# --- 2. THEME & HEADER TOGGLE ---
 if "dark_mode" not in st.session_state:
   st.session_state.dark_mode = True
 
-# Theme Colors
+top_col1, top_col2 = st.columns([3, 1])
+with top_col1:
+  st.markdown("### ⚡ OHE ATD Smart Tool")
+with top_col2:
+  is_dark = st.toggle("🌙 Dark Mode", value=st.session_state.dark_mode)
+  if is_dark != st.session_state.dark_mode:
+    st.session_state.dark_mode = is_dark
+    st.rerun()
+
 if st.session_state.dark_mode:
   bg_color = "#050a0f"
   text_color = "#ffffff"
@@ -31,94 +40,65 @@ else:
 st.markdown(
     f"""
     <style>
-    .block-container {{
-        padding-top: 0.5rem !important;
-        padding-bottom: 1rem !important;
-        padding-left: 0.8rem !important;
-        padding-right: 0.8rem !important;
-        max-width: 520px !important;
-    }}
     .stApp {{ background-color: {bg_color}; color: {text_color}; }}
-    hr {{ margin: 6px 0px !important; }}
-    div[data-testid="stVerticalBlock"] > div {{
-        gap: 0.35rem !important;
-    }}
+    
     .area-box {{ 
-        padding: 6px 10px; 
+        padding: 10px 14px; 
         background-color: {card_bg}; 
-        border: 1px solid {border_accent}; 
-        border-radius: 8px; 
+        border: 1.5px solid {border_accent}; 
+        border-radius: 10px; 
         text-align: center;
-        margin: 4px 0px;
+        margin: 8px 0px;
     }}
-    .area-label {{ color: {border_accent}; font-size: 11px; font-weight: bold; }}
-    .area-text {{ font-size: 13px; font-weight: 600; color: {text_color}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+    .area-label {{ color: {border_accent}; font-size: 12px; font-weight: bold; }}
+    .area-text {{ font-size: 15px; font-weight: 600; color: {text_color}; }}
+
     .length-display {{
-        font-size: 17px !important;
+        font-size: 20px !important;
         font-weight: bold;
         color: {calc_val_color};
-        padding: 6px 10px;
+        padding: 8px 14px;
         background: {card_bg};
-        border-radius: 6px;
-        border-left: 5px solid {calc_val_color};
-        margin: 2px 0px;
+        border-radius: 8px;
+        border-left: 6px solid {calc_val_color};
+        margin: 6px 0px;
         text-align: center;
     }}
+
     .metric-calc-box {{
         background: {card_bg};
-        border: 1px solid {border_accent};
-        border-radius: 8px;
-        padding: 6px;
+        border: 1.5px solid {border_accent};
+        border-radius: 10px;
+        padding: 10px;
         text-align: center;
     }}
     .metric-calc-label {{
-        font-size: 11px;
+        font-size: 13px;
         font-weight: bold;
         color: {text_color};
         opacity: 0.85;
     }}
     .metric-calc-val {{
-        font-size: 22px;
+        font-size: 26px;
         font-weight: bold;
         color: {calc_val_color};
-        line-height: 1.2;
+        margin-top: 2px;
     }}
+
     .stButton>button {{
         background-color: {border_accent} !important;
         color: black !important;
         font-weight: bold !important;
         width: 100% !important;
-        height: 2.4em !important;
-        border-radius: 6px;
-        font-size: 13px !important;
-    }}
-    div[data-testid="stNumberInput"] label {{
-        font-size: 12px !important;
-        margin-bottom: -4px !important;
-    }}
-    div[data-testid="stToggle"] {{
-        margin-top: 4px !important;
+        height: 2.8em !important;
+        border-radius: 8px;
     }}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# --- HEADER WITH VISIBLE THEME TOGGLE ---
-h_col1, h_col2 = st.columns([2.2, 1])
-with h_col1:
-  st.markdown(
-      f"<h3 style='color: {border_accent}; margin: 0px;'>⚡ OHE ATD Smart"
-      " Tool</h3>",
-      unsafe_allow_html=True,
-  )
-with h_col2:
-  is_dark = st.toggle("🌙 Dark", value=st.session_state.dark_mode)
-  if is_dark != st.session_state.dark_mode:
-    st.session_state.dark_mode = is_dark
-    st.rerun()
-
-# --- 2. DATA LOADING ---
+# --- 3. DATA LOADING ---
 SHEET_ID = "1vfioGSmpC7a5S8SMUpCk9xn-mtttvcTecLEQ1Sd6XkU"
 SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
@@ -133,10 +113,10 @@ def load_sheet_data():
     return None
 
 
-# --- 3. ROBUST WEATHER & GEO ENGINE ---
+# --- 4. WEATHER ENGINE ---
 def fetch_weather(lat, lon):
   try:
-    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m&current_weather=true"
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}¤t=temperature_2m¤t_weather=true"
     res = requests.get(url, timeout=6).json()
     if "current" in res and "temperature_2m" in res["current"]:
       return round(float(res["current"]["temperature_2m"]), 1)
@@ -163,7 +143,7 @@ def fetch_city_weather(city_name):
     return 35.0, "Network Error"
 
 
-# --- 4. SESSION STATE INITIALIZATION ---
+# --- 5. INITIAL STATE ---
 if "current_temp" not in st.session_state:
   st.session_state.current_temp = 35.0
 if "temp_sync_ver" not in st.session_state:
@@ -173,13 +153,11 @@ if "area_name" not in st.session_state:
 
 df = load_sheet_data()
 
-# --- 5. STRUCTURE SELECTION ---
+# --- 6. STRUCTURE SELECTION ---
 if df is not None:
   struct_list = df["Structure_No"].dropna().unique().tolist()
   selected_struct = st.selectbox(
-      "Select Mast / Structure",
-      ["Manual Entry"] + struct_list,
-      label_visibility="collapsed",
+      "📍 Select Structure No", ["Manual Entry"] + struct_list
   )
   if selected_struct != "Manual Entry":
     L = float(
@@ -190,41 +168,37 @@ if df is not None:
         unsafe_allow_html=True,
     )
   else:
-    L = st.number_input(
-        "Tension Length (L)", value=750.0, step=10.0, format="%.1f"
-    )
+    L = st.number_input("Enter Tension Length (L) manually", value=750.0)
 else:
-  L = st.number_input(
-      "Tension Length (L)", value=750.0, step=10.0, format="%.1f"
-  )
+  L = st.number_input("Enter Tension Length (L) manually", value=750.0)
 
-# --- 6. LOCATION & GPS ROW ---
-col_loc_type, col_loc_action = st.columns([1, 1.8])
-with col_loc_type:
-  manual_loc = st.checkbox("Manual City", value=False)
+st.divider()
+
+# --- 7. LOCATION MODE ---
+manual_loc = st.checkbox("✍️ Enter Location Manually", value=False)
 
 if manual_loc:
-  c_in, c_btn = st.columns([2, 1])
-  with c_in:
+  c1, c2 = st.columns([2.5, 1.2])
+  with c1:
     city_input = st.text_input(
-        "City", value="Kodinar", label_visibility="collapsed"
+        "Enter City Name", value="Kodinar", label_visibility="collapsed"
     )
-  with c_btn:
+  with c2:
     if st.button("🔍 FETCH"):
-      with st.spinner(".."):
+      with st.spinner("Fetching..."):
         t, a = fetch_city_weather(city_input)
         st.session_state.current_temp = float(t)
         st.session_state.temp_sync_ver += 1
         st.session_state.area_name = a
         st.rerun()
 else:
-  cg1, cg2 = st.columns([1.1, 1.9])
-  with cg1:
+  c1, c2 = st.columns([1.5, 2])
+  with c1:
     location = streamlit_geolocation()
-  with cg2:
-    if st.button("🌡️ SYNC TEMP"):
+  with c2:
+    if st.button("🌡️ SYNC LIVE AREA & TEMP"):
       if location and location.get("latitude") and location.get("longitude"):
-        with st.spinner(".."):
+        with st.spinner("Syncing..."):
           lat = location["latitude"]
           lon = location["longitude"]
           live_temp = fetch_weather(lat, lon)
@@ -237,57 +211,58 @@ else:
                 g_url, headers={"User-Agent": "OHE_Railway_ATD_Tool"}, timeout=6
             ).json()
             st.session_state.area_name = g_res.get(
-                "display_name", f"{lat:.2f}, {lon:.2f}"
+                "display_name", f"Lat: {lat:.3f}, Lon: {lon:.3f}"
             )
           except Exception:
-            st.session_state.area_name = f"{lat:.2f}, {lon:.2f}"
+            st.session_state.area_name = f"Lat: {lat:.3f}, Lon: {lon:.3f}"
           st.rerun()
       else:
-        st.toast("⚠️ Pehle ⌖ icon dabayein, phir Sync dabayein!", icon="📍")
+        st.toast("⚠️ Pehle ⌖ icon dabayein, phir Sync karein!", icon="📍")
 
-# Active Section Pill
+# Active Section Banner
 st.markdown(
     f"""
     <div class="area-box">
-        <span class="area-label">📡 SECTION: </span>
-        <span class="area-text">{st.session_state.area_name}</span>
+        <div class="area-label">📡 ACTIVE SECTION</div>
+        <div class="area-text">{st.session_state.area_name}</div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-# --- 7. SLIM VERTICAL THERMOMETER & TEMPERATURE DISPLAY ---
-col_slim_therm, col_temp_controls = st.columns([0.45, 1.55])
+# --- 8. TEMPERATURE & ANIMATED THERMOMETER (BALANCED SIDE-BY-SIDE) ---
+col_therm, col_temp = st.columns([1, 1.6])
 
-with col_temp_controls:
+with col_temp:
   theta_2 = st.number_input(
-      "Ambient Temp (°C)",
+      "Current Temp (°C)",
       value=float(st.session_state.current_temp),
       step=0.5,
       min_value=-5.0,
       max_value=60.0,
-      key=f"temp_widget_{st.session_state.temp_sync_ver}",
+      key=f"temp_val_{st.session_state.temp_sync_ver}",
   )
   st.session_state.current_temp = float(theta_2)
 
   if theta_2 >= 40:
     temp_status = (
-        "<span style='color: #ff3366; font-size:12px; font-weight:"
-        " bold;'>🔥 High (Summer)</span>"
+        "<span style='color: #ff3366; font-weight: bold;'>🔥 High Ambient"
+        " (Summer)</span>"
     )
   elif theta_2 <= 15:
     temp_status = (
-        "<span style='color: #00d4ff; font-size:12px; font-weight:"
-        " bold;'>❄️ Low (Winter)</span>"
+        "<span style='color: #00d4ff; font-weight: bold;'>❄️ Low Ambient"
+        " (Winter)</span>"
     )
   else:
     temp_status = (
-        "<span style='color: #00ff41; font-size:12px; font-weight:"
-        " bold;'>⚡ Standard (35° Base)</span>"
+        "<span style='color: #00ff41; font-weight: bold;'>⚡ Standard Range"
+        " (35° Base)</span>"
     )
 
   st.markdown(
-      f"<div style='margin-top: -3px; margin-bottom: 4px;'>{temp_status}</div>",
+      f"<div style='font-size: 13px; margin-top: 4px;'>Status:"
+      f" {temp_status}</div>",
       unsafe_allow_html=True,
   )
 
@@ -299,17 +274,17 @@ mercury_percent = int(
 
 if theta_2 < 20:
   mercury_color = "#00d4ff"
-  glow_color = "rgba(0, 212, 255, 0.5)"
+  glow_color = "rgba(0, 212, 255, 0.6)"
 elif theta_2 < 38:
   mercury_color = "#00ff41"
-  glow_color = "rgba(0, 255, 65, 0.5)"
+  glow_color = "rgba(0, 255, 65, 0.6)"
 else:
   mercury_color = "#ff3366"
-  glow_color = "rgba(255, 51, 102, 0.5)"
+  glow_color = "rgba(255, 51, 102, 0.6)"
 
-with col_slim_therm:
+with col_therm:
   thermometer_html = f"""
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 85px; background: {card_bg}; border-radius: 6px; border: 1px solid {border_accent}; padding: 4px 0px;">
+    <div style="display: flex; align-items: center; justify-content: center; gap: 12px; height: 110px; background: {card_bg}; border-radius: 10px; border: 1.5px solid {border_accent}; padding: 6px;">
         <style>
             @keyframes riseMercury {{
                 0% {{ height: 5%; }}
@@ -317,12 +292,12 @@ with col_slim_therm:
             }}
             .thermo-tube {{
                 position: relative;
-                width: 10px;
-                height: 52px;
-                background: #0b0f14;
-                border: 1px solid #3a4759;
+                width: 14px;
+                height: 65px;
+                background: #0f141c;
+                border: 1.5px solid #3a4759;
                 border-bottom: none;
-                border-radius: 6px 6px 0 0;
+                border-radius: 8px 8px 0 0;
                 overflow: hidden;
                 display: flex;
                 align-items: flex-end;
@@ -331,69 +306,79 @@ with col_slim_therm:
             .thermo-mercury {{
                 width: 100%;
                 height: {mercury_percent}%;
-                background: {mercury_color};
-                border-radius: 4px 4px 0 0;
-                box-shadow: 0 0 6px {glow_color};
+                background: linear-gradient(to top, {mercury_color}, #ffdd00);
+                border-radius: 6px 6px 0 0;
+                box-shadow: 0 0 8px {glow_color};
                 animation: riseMercury 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
             }}
             .thermo-bulb {{
-                width: 18px;
-                height: 18px;
+                width: 26px;
+                height: 26px;
                 background: {mercury_color};
-                border: 1px solid #3a4759;
+                border: 1.5px solid #3a4759;
                 border-radius: 50%;
-                margin: -3px auto 0 auto;
-                box-shadow: 0 0 8px {glow_color};
+                margin: -4px auto 0 auto;
+                box-shadow: 0 0 10px {glow_color};
             }}
-            .temp-badge {{
-                font-size: 11px;
+            .temp-readout {{
+                font-size: 22px;
                 font-weight: 800;
                 color: {mercury_color};
-                margin-top: 2px;
+                text-shadow: 0 0 6px {glow_color};
+                line-height: 1.1;
             }}
         </style>
-        <div class="thermo-tube">
-            <div class="thermo-mercury"></div>
+        
+        <div style="text-align: center;">
+            <div class="thermo-tube">
+                <div class="thermo-mercury"></div>
+            </div>
+            <div class="thermo-bulb"></div>
         </div>
-        <div class="thermo-bulb"></div>
-        <div class="temp-badge">{theta_2:.1f}°</div>
+
+        <div>
+            <div style="font-size: 11px; color: #8c9ba5; font-weight: bold; letter-spacing: 0.5px;">AMBIENT</div>
+            <div class="temp-readout">{theta_2:.1f}°C</div>
+        </div>
     </div>
     """
-  st.components.v1.html(thermometer_html, height=92)
+  st.components.v1.html(thermometer_html, height=125)
 
-# --- 8. CALCULATION & VALUES ---
+# --- 9. CALCULATION & VALUES (GRID) ---
 delta = L * 0.000017 * (35 - theta_2) * 1000
 x_val, y_val = 1300 + delta, 2300 + (3 * delta)
+
+st.divider()
 
 col_x1, col_x2 = st.columns(2)
 with col_x1:
   st.markdown(
       f"""<div class="metric-calc-box">
-        <div class="metric-calc-label">Chart X (mm)</div>
-        <div class="metric-calc-val">{round(x_val, 1)}</div>
+        <div class="metric-calc-label">Calculated X (Chart)</div>
+        <div class="metric-calc-val">{round(x_val, 1)} mm</div>
     </div>""",
       unsafe_allow_html=True,
   )
 with col_x2:
   x_measured = st.number_input(
-      "Site X (mm)", value=float(round(x_val, 1)), step=1.0
+      "Site Measured X (mm)", value=float(round(x_val, 1)), step=1.0
   )
 
 col_y1, col_y2 = st.columns(2)
 with col_y1:
   st.markdown(
       f"""<div class="metric-calc-box">
-        <div class="metric-calc-label">Chart Y (mm)</div>
-        <div class="metric-calc-val">{round(y_val, 1)}</div>
+        <div class="metric-calc-label">Calculated Y (Chart)</div>
+        <div class="metric-calc-val">{round(y_val, 1)} mm</div>
     </div>""",
       unsafe_allow_html=True,
   )
 with col_y2:
   y_measured = st.number_input(
-      "Site Y (mm)", value=float(round(y_val, 1)), step=1.0
+      "Site Measured Y (mm)", value=float(round(y_val, 1)), step=1.0
   )
 
-# --- 9. ULTRA HD IMAGE CARD GENERATOR ---
+# --- 10. ULTRA HD IMAGE CARD GENERATOR ---
 ist_offset = timezone(timedelta(hours=5, minutes=30))
 curr_dt = datetime.now(ist_offset).strftime("%d-%b-%Y %I:%M:%S %p")
 struct_disp = selected_struct if "selected_struct" in locals() else "N/A"
@@ -462,7 +447,7 @@ draw.text(
 buf = io.BytesIO()
 img.save(buf, format="PNG")
 
-# --- 10. SAVE & SHARE BUTTONS ---
+# --- 11. SAVE & SHARE BUTTONS ---
 b64_img = base64.b64encode(buf.getvalue()).decode("utf-8")
 file_name_ts = (
     f"ATD_Record_{datetime.now(ist_offset).strftime('%Y%m%d_%H%M%S')}.png"
@@ -490,7 +475,7 @@ with btn_col1:
     st.toast("✅ Image Saved Successfully!", icon="💾")
 
   st.download_button(
-      label="💾 SAVE IMG",
+      label="💾 SAVE IMAGE",
       data=buf.getvalue(),
       file_name=file_name_ts,
       mime="image/png",
@@ -504,14 +489,14 @@ with btn_col2:
         <button id="shareBtn" style="
             background-color: #25D366;
             color: white;
-            border: 1px solid #20ba5a;
+            border: 1.5px solid #20ba5a;
             font-weight: bold;
-            font-size: 13px;
+            font-size: 14px;
             width: 100%;
-            height: 38px;
-            border-radius: 6px;
+            height: 42px;
+            border-radius: 8px;
             cursor: pointer;
-        ">📲 SHARE</button>
+        ">📲 SHARE REPORT</button>
     </div>
 
     <script>
@@ -550,10 +535,10 @@ with btn_col2:
     }};
     </script>
     """
-  st.components.v1.html(share_button_html, height=45)
+  st.components.v1.html(share_button_html, height=52)
 
 st.markdown(
-    "<div style='text-align: center; font-size: 9px; margin-top: 10px;"
-    " opacity: 0.5;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>",
+    "<div style='text-align: center; font-size: 10px; margin-top: 25px;"
+    " opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>",
     unsafe_allow_html=True,
 )
