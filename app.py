@@ -97,28 +97,37 @@ def load_sheet_data():
     return None
 
 
-# --- 3. ADVANCED WEATHER ENGINE ---
-def get_weather_by_coords(lat, lon):
+# --- 3. ROBUST WEATHER & GEO ENGINE ---
+def fetch_weather(lat, lon):
+  """Safe temperature fetch supporting modern Open-Meteo payload formats."""
   try:
-    w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}¤t_weather=true"
-    w_res = requests.get(w_url, timeout=5).json()
-    return round(float(w_res["current_weather"]["temperature"]), 1)
-  except:
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}¤t=temperature_2m¤t_weather=true"
+    res = requests.get(url, timeout=6).json()
+
+    # Priority 1: Modern Open-Meteo endpoint
+    if "current" in res and "temperature_2m" in res["current"]:
+      return round(float(res["current"]["temperature_2m"]), 1)
+    # Priority 2: Classic Open-Meteo endpoint
+    elif "current_weather" in res and "temperature" in res["current_weather"]:
+      return round(float(res["current_weather"]["temperature"]), 1)
+    return 35.0
+  except Exception:
     return 35.0
 
 
-def get_manual_city_data(city_name):
+def fetch_city_weather(city_name):
   try:
-    geo_url = f"https://nominatim.openstreetmap.org/search?q={city_name}&format=json&limit=1"
+    geo_url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city_name)}&format=json&limit=1"
     res = requests.get(
-        geo_url, headers={"User-Agent": "RailwayTool"}, timeout=5
+        geo_url, headers={"User-Agent": "OHE_Railway_ATD_Tool"}, timeout=6
     ).json()
-    if res:
-      lat, lon = res[0]["lat"], res[0]["lon"]
-      temp = get_weather_by_coords(lat, lon)
-      return temp, res[0]["display_name"]
+    if res and len(res) > 0:
+      lat = float(res[0]["lat"])
+      lon = float(res[0]["lon"])
+      temp = fetch_weather(lat, lon)
+      return temp, res[0].get("display_name", city_name)
     return 35.0, "City Not Found"
-  except:
+  except Exception:
     return 35.0, "Network Error"
 
 
@@ -166,26 +175,37 @@ if manual_loc:
   )
   if st.button("🔍 FETCH TEMP FOR THIS CITY"):
     with st.spinner("Fetching data..."):
-      t, a = get_manual_city_data(city_input)
+      t, a = fetch_city_weather(city_input)
       st.session_state.temp_val = t
       st.session_state.area_name = a
+      st.rerun()
 else:
   st.write("🛰️ GPS Mode")
   location = streamlit_geolocation()
-  if location and location.get("latitude"):
-    if st.button("🌡️ SYNC LIVE AREA & TEMP"):
-      with st.spinner("Syncing..."):
-        w_url = f"https://api.open-meteo.com/v1/forecast?latitude={location['latitude']}&longitude={location['longitude']}¤t_weather=true"
-        w_res = requests.get(w_url, timeout=5).json()
-        st.session_state.temp_val = round(
-            float(w_res["current_weather"]["temperature"]), 1
-        )
 
-        g_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={location['latitude']}&lon={location['longitude']}"
-        g_res = requests.get(
-            g_url, headers={"User-Agent": "RailwayTool"}, timeout=5
-        ).json()
-        st.session_state.area_name = g_res.get("display_name", "Local Section")
+  if st.button("🌡️ SYNC LIVE AREA & TEMP"):
+    if location and location.get("latitude") and location.get("longitude"):
+      with st.spinner("Syncing GPS & Temperature..."):
+        lat = location["latitude"]
+        lon = location["longitude"]
+        st.session_state.temp_val = fetch_weather(lat, lon)
+
+        try:
+          g_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+          g_res = requests.get(
+              g_url, headers={"User-Agent": "OHE_Railway_ATD_Tool"}, timeout=6
+          ).json()
+          st.session_state.area_name = g_res.get(
+              "display_name", f"Lat: {lat:.3f}, Lon: {lon:.3f}"
+          )
+        except Exception:
+          st.session_state.area_name = f"Lat: {lat:.3f}, Lon: {lon:.3f}"
+        st.rerun()
+    else:
+      st.warning(
+          "⚠️ Pehle upar diye gaye GPS button ⌖ par tap karein taaki coordinates"
+          " lock ho sakein. Phir Sync dabayein."
+      )
 
 # --- 7. DISPLAY & RESULTS (ANIMATED THERMOMETER + INPUT) ---
 st.markdown(
@@ -310,7 +330,7 @@ with col_therm:
     """
   st.components.v1.html(thermometer_html, height=195)
 
-# --- 8. CALCULATION & SIDE-BY-SIDE VALUES DISPLAY ---
+# --- 8. CALCULATION & VALUES DISPLAY ---
 delta = L * 0.000017 * (35 - theta_2) * 1000
 x_val, y_val = 1300 + delta, 2300 + (3 * delta)
 
@@ -367,7 +387,6 @@ try:
 except Exception:
   font_title = font_body = font_val = ImageFont.load_default()
 
-# Outer Border & Header
 draw.rectangle(
     [20 * scale, 20 * scale, width - 20 * scale, height - 20 * scale],
     outline="#00d4ff",
@@ -398,7 +417,6 @@ for line in lines:
   draw.text((40 * scale, y_off), line, fill="#ffffff", font=font_body)
   y_off += 40 * scale
 
-# Output Box showing Chart vs Measured Values
 draw.rectangle(
     [40 * scale, 340 * scale, width - 40 * scale, 520 * scale],
     fill="#1c2128",
@@ -450,7 +468,7 @@ with btn_col1:
     st.toast("✅ Image Saved Successfully!", icon="💾")
 
   st.download_button(
-      label="💾 SAVE IMG",
+      label="💾 SAVE IMAGE",
       data=buf.getvalue(),
       file_name=file_name_ts,
       mime="image/png",
