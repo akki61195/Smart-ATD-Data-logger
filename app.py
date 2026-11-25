@@ -85,6 +85,14 @@ st.markdown(f"""
         height: 2.8em !important;
         border-radius: 8px;
     }}
+    div[data-testid="stDownloadButton"]>button {{
+        background-color: #002b49 !important;
+        color: #ccff00 !important;
+        border: 1.5px solid #00d4ff !important;
+        font-weight: bold !important;
+        height: 42px !important;
+        border-radius: 8px !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -101,30 +109,43 @@ def load_sheet_data():
     except:
         return None
 
-# --- 3. WEATHER ENGINE ---
+# --- 3. DUAL-API WEATHER ENGINE (OPEN-METEO + WTTR FALLBACK) ---
 def get_weather_by_coords(lat, lon):
+    # API 1: Open-Meteo (Primary)
     try:
-        w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}¤t=temperature_2m¤t_weather=true"
-        w_res = requests.get(w_url, timeout=6).json()
-        if "current" in w_res and "temperature_2m" in w_res["current"]:
-            return round(float(w_res["current"]["temperature_2m"]), 1)
-        elif "current_weather" in w_res and "temperature" in w_res["current_weather"]:
-            return round(float(w_res["current_weather"]["temperature"]), 1)
-        return 35.0
-    except:
-        return 35.0
+        w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}¤t=temperature_2m"
+        r = requests.get(w_url, headers={"User-Agent": "OHE_ATD_Tool/1.0"}, timeout=6)
+        if r.status_code == 200:
+            data = r.json()
+            if "current" in data and "temperature_2m" in data["current"]:
+                return round(float(data["current"]["temperature_2m"]), 1), None
+    except Exception:
+        pass
+
+    # API 2: wttr.in (Backup agar Open-Meteo server IP block kare)
+    try:
+        b_url = f"https://wttr.in/{lat},{lon}?format=j1"
+        r2 = requests.get(b_url, headers={"User-Agent": "OHE_ATD_Tool/1.0"}, timeout=6)
+        if r2.status_code == 200:
+            data2 = r2.json()
+            temp_c = data2["current_condition"][0]["temp_C"]
+            return round(float(temp_c), 1), None
+    except Exception as e:
+        return None, str(e)
+
+    return None, "Both weather servers unreachable"
 
 def get_manual_city_data(city_name):
     try:
         geo_url = f"https://nominatim.openstreetmap.org/search?q={urllib.parse.quote(city_name)}&format=json&limit=1"
-        res = requests.get(geo_url, headers={"User-Agent": "RailwayTool_OHE"}, timeout=6).json()
+        res = requests.get(geo_url, headers={"User-Agent": "OHE_ATD_Tool/1.0"}, timeout=6).json()
         if res:
             lat, lon = res[0]["lat"], res[0]["lon"]
-            temp = get_weather_by_coords(lat, lon)
-            return temp, res[0]["display_name"]
-        return 35.0, "City Not Found"
-    except:
-        return 35.0, "Network Error"
+            temp, err = get_weather_by_coords(lat, lon)
+            return temp, res[0]["display_name"], err
+        return None, "City Not Found", "City not found"
+    except Exception as e:
+        return None, "Network Error", str(e)
 
 # --- 4. STATE INITIALIZATION ---
 if "temp_val" not in st.session_state:
@@ -160,10 +181,14 @@ if manual_loc:
     with c2:
         if st.button("🔍 FETCH"):
             with st.spinner("Fetching..."):
-                t, a = get_manual_city_data(city_input)
-                st.session_state.temp_val = float(t)
+                t, a, err = get_manual_city_data(city_input)
                 st.session_state.area_name = a
-                st.session_state.sync_id += 1  # Forces input box to refresh!
+                if t is not None:
+                    st.session_state.temp_val = float(t)
+                    st.session_state.sync_id += 1
+                    st.toast(f"✅ Temp: {t}°C", icon="🌡️")
+                else:
+                    st.error(f"Temp fetch error: {err}")
 else:
     c1, c2 = st.columns([1.5, 2])
     with c1:
@@ -172,12 +197,17 @@ else:
         if location and location.get("latitude"):
             if st.button("🌡️ SYNC LIVE AREA & TEMP"):
                 with st.spinner("Syncing..."):
-                    fetched_t = get_weather_by_coords(location["latitude"], location["longitude"])
-                    st.session_state.temp_val = float(fetched_t)
-                    st.session_state.sync_id += 1  # Forces input box to refresh!
+                    fetched_t, err = get_weather_by_coords(location["latitude"], location["longitude"])
+                    if fetched_t is not None:
+                        st.session_state.temp_val = float(fetched_t)
+                        st.session_state.sync_id += 1
+                        st.toast(f"✅ Temp: {fetched_t}°C", icon="🌡️")
+                    else:
+                        st.error(f"Temp fetch error: {err}")
+
                     try:
                         g_url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={location['latitude']}&lon={location['longitude']}"
-                        g_res = requests.get(g_url, headers={"User-Agent": "RailwayTool_OHE"}, timeout=6).json()
+                        g_res = requests.get(g_url, headers={"User-Agent": "OHE_ATD_Tool/1.0"}, timeout=6).json()
                         st.session_state.area_name = g_res.get("display_name", "Local Section")
                     except:
                         st.session_state.area_name = "Local Section"
@@ -194,7 +224,6 @@ st.markdown(f"""
 col_therm, col_temp = st.columns([1, 1.6])
 
 with col_temp:
-    # Dynamic key tied to sync_id guarantees fresh value on every Sync/Fetch
     theta_2 = st.number_input(
         "Current Temp (°C)",
         value=float(st.session_state.temp_val),
@@ -437,4 +466,4 @@ with btn_col2:
     """
     st.components.v1.html(share_button_html, height=52)
 
-st.markdown("<div style='text-align: center; font-size: 10px; margin-top: 25px; opacity: 0.6;'>DEVELOPED BY: A.K.MMULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center; font-size: 10px; margin-top: 25px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
