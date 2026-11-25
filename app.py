@@ -437,4 +437,4 @@ with btn_col2:
     """
     st.components.v1.html(share_button_html, height=52)
 
-st.markdown("<div style='text-align: center; font-size: 10px; margin-top: 25px; opacity: 0.6;'>DEVELOPED BY: A.K.MULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align: center; font-size: 10px; margin-top: 25px; opacity: 0.6;'>DEVELOPED BY: A.K.MMULCHANDANI JE/TRD</div>", unsafe_allow_html=True)
